@@ -11,22 +11,21 @@
 <name>Smart save</name>
 <category>jazzy</category>
 <enableinfo>true</enableinfo>
-<eventid>68c86e88-e0d0-4571-a116-3d653eed4be3</eventid>
+<eventid>d2801bd0-adb4-4872-bd68-a688d0e6e151</eventid>
 <terminology><![CDATA[<< /Version 1
                         /Events <<
-                        /68c86e88-e0d0-4571-a116-3d653eed4be3 [(Smart save) <<
-                        /newFolder [(saveInNewFolder) /boolean]                       
-                        /path [(newFolderPath) /string]
-                        /fileType [(fileType) /string] 
-                        /jpgQuality [(jpgQuality) /number]                        
-                        /flatten [(flattenLayers) /boolean] 
-                        /createSubFolder [(createSubFolder) /boolean]                         
-                        /subFolderOpt [(subFolderOptions) /string] 
-                        /renameFile [(renameFile) /boolean] 
-                        /renameFileOpt [(renameFileOptions) /string] 
-                        /sequenceId [(sequenceId) /string]     
-                        /replace [(replaceWhenSave) /boolean]    
-                        /preset [(preset) /string]                     
+                        /d2801bd0-adb4-4872-bd68-a688d0e6e151 [(Smart save) <<
+                        /newFolder [(saveToNewFolder) /boolean]
+                        /path [(destinationPath) /string]
+                        /createSubFolder [(createSubfolder) /boolean]
+                        /subFolderOpt [(subfolderTemplate) /string]
+                        /renameFile [(renameFile) /boolean]
+                        /renameFileOpt [(filenameTemplate) /string]
+                        /sequenceId [(sequenceID) /string]
+                        /replace [(overwriteExisting) /boolean]
+                        /preset [(preset) /string]
+                        /saveFormat [(saveFormat) /string]
+                        /saveDescriptor [(saveOptions) /string]
                         >>]
                          >>
                       >> ]]></terminology>
@@ -38,8 +37,8 @@ $.localize = true
 //$.locale = "ru"
 
 //bin here
-var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
-    rev = "0.8",
+var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
+    ver = "0.11",
     stCurFilename = { en: "Current filename:", ru: "Текущее имя:" },
     stNewFilname = { en: "New filename:", ru: "Новое имя:" },
     strAddToBegin = { en: "Insert before", ru: "Добавить в начало" },
@@ -58,14 +57,11 @@ var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
     strEDoc = { en: "Every document", ru: "Каждый документ" },
     strESave = { en: "Every save", ru: "Каждое сохранение" },
     strExt = { en: "Extension", ru: "Расширение" },
-    strFileType = { en: "File format", ru: "Формат файла" },
-    strFilter = { en: "Character filter", ru: "Фильтр симоволов" },
+    strFilter = { en: "Character filter", ru: "Фильтр символов" },
     strFiveDig = { en: "Five digits", ru: "Пять цифр" },
-    strFlatten = { en: "flatten layers before save", ru: "объединять слои перед сохранением" },
     strFolderDest = { en: "Destination directory", ru: "Каталог назначения" },
     strFourDig = { en: "Four digits", ru: "Четыре цифры" },
     strInSameFolder = { en: "save in the same directory", ru: "сохранить в том же каталоге" },
-    strJpgQuality = { en: "jpg quality:", ru: "качество jpg:" },
     strLat = { en: "Latin", ru: "Латиница" },
     strLCase = { en: "lower case", ru: "строчные" },
     strLetters = { en: "Letters", ru: "Буквы" },
@@ -90,7 +86,6 @@ var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
     strRoundDec = { en: "Up to decimal", ru: "До десятых" },
     strRoundInt = { en: "Up to integer", ru: "До целого" },
     strRoundTwoDec = { en: "Up to two decimal", ru: "До сотых" },
-    strSaveAs = { en: "save as...", ru: "Сохранить как..." },
     strSaveFile = { en: "Save opened file", ru: "Сохранить открытый файл" },
     strSearch = { en: "Search:", ru: "Найти:" },
     strSeq = { en: "Sequence", ru: "Счетчик" },
@@ -118,9 +113,9 @@ var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
     strTranslitFoward = { en: "Transliterate CYR-LAT", ru: "Транслит CYR-LAT" },
     strTwoDig = { en: "Two digits", ru: "Две цифры" },
     strUCase = { en: "UPPER CASE", ru: "ПРОПИСНЫЕ" },
-    strYestedray = { en: "Yestedray", ru: "Вчера" },
+    strYestedray = { en: "Yesterday", ru: "Вчера" },
     msgSave = { en: "File does not have a path. Saving in the same directory is not possible!\nSave the file before running the script, or change the settings", ru: "Файл не имеет пути. Сохранение в тот же каталог невозможно!\nСохраните файл перед запуском скрипта, либо измените настройки" },
-    strDefailt = { ru: "по-умолчанию", en: "default" },
+    strDefailt = { ru: "по умолчанию", en: "default" },
     strPresetSave={ru: "Сохранить", en: "Save"},
     strPresetSaveAs={ru: "Добавить", en: "Add new"},
     strPresetDelete={ru: "Удалить", en: "Delete"},
@@ -130,115 +125,111 @@ var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
     strPreset = { ru: "Сохранение пресета", en: "Saving a preset" },
     strPresetPromt = { ru: "Укажите имя пресета\nБудут сохранены настройки имени подкаталога и файла.", en: "Specify the name of the preset\nSubdirectory and file name settings will be saved." },
     strCopy = { ru: " копия", en: " copy" },
+    strSaveAgain = { ru: "Сохранить заново…", en: "Save again…" },
+    strFormat = { ru: "Формат:", en: "Format:" },
+    strNotSet = { ru: "не задан", en: "not set" },
+    msgNoSaveDescriptor = { ru: "Для этого шага экшена не сохранены параметры формата. Откройте шаг двойным щелчком и нажмите «Сохранить заново…».", en: "No save-format parameters are stored for this action step. Open the step and click “Save again…”." },
+    msgCreateFolder = { ru: "Не удалось создать каталог:\n%1", en: "Could not create folder:\n%1" },
+    msgCaptureSave = { ru: "Photoshop выполнил сохранение, но не вернул параметры формата. Повторите «Сохранить заново…».", en: "Photoshop completed the save but did not return reusable format parameters. Run “Save again…” once more." },
     strErrPreset={ru: "Набор с именем \"%1\" уже существует. Перезаписать?", en: "A set with the name \"%1\" already exists. Overwrite?"}
 
 var sysDiv = "/"; if ( $.os.search(/windows/i) != -1 ) {sysDiv='\\'}
 
-var cancelButtonID = 2,
-renew = false, // начальная загрузка, не тратить время на загрузку данных из элементов
-CFG = new Config (), 
-metadata = new Metadata (),
-preset = new Preset()
+var PRESET_KEY = GUID + "-presets";
 
-var cacheFld = []; for (var i=0; i<10; i++) {cacheFld.push (new cacheRecord ("", "")) } // кэш для настроек и значений каталогов
-var cacheFle = []; for (var i=0; i<10; i++) {cacheFle.push (new cacheRecord ("", "")) } // кэш для настроек и значений файлов
+var saveButtonID = 1;
+var cancelButtonID = 2;
+var settingsButtonID = 3;
+var renew = false; // начальная загрузка, не тратить время на загрузку данных из элементов
+var CFG = new Config();
+var metadata = new Metadata();
+var preset = new Preset();
+
+var cacheFld = makeSmartSaveCache(); // кэш для настроек и значений каталогов
+var cacheFle = makeSmartSaveCache(); // кэш для настроек и значений файлов
+
+function makeSmartSaveCache()
+{
+    var out = [];
+    for (var i = 0; i < 10; i++) out.push(new cacheRecord("", ""));
+    return out;
+}
 
 if (metadata.hasOwnProperty("doc")) main ()
 
 function main ()
 {
-if (!app.playbackParameters.count)  
-    {  
-   // normal run
-    try {var d = app.getCustomOptions(GUID)
-    if (d!=undefined) descriptorToObject(CFG, d, strMessage)} catch (e) {}
-    
-    initSeq () //загружаем счетчик
-    generateUUID () //генерируем и записываем id , который будет зафиксирован в настройках
-    
-    var w = buildWindow (); var result = w.show()
-
-    if (result == cancelButtonID) { return 'cancel' } else  // if cancelled
+    if (!app.playbackParameters.count)
     {
-        // normal run   
-        var parentPath = ""
-        var newPath = createName(CFG.subFolderOpt, cacheFld)
+        // normal run / action recording
+        try {
+            var d = app.getCustomOptions(GUID)
+            if (d != undefined) descriptorToObject(CFG, d, strMessage)
+        } catch (e) {}
 
-        if (CFG.newFolder == true && CFG.path != "") { parentPath = CFG.path } else { parentPath = metadata.curPath }
-        if (CFG.createSubFolder && newPath != "") parentPath += sysDiv + newPath
+        initSeq()
+        generateUUID()
 
-        var targetName = createName(CFG.renameFileOpt, cacheFle)
-        if (targetName == "" || CFG.renameFile == false) targetName = metadata.curFilename
+        var w = buildWindow(false)
+        var result = w.show()
+        if (result == cancelButtonID) return 'cancel'
 
-        switch (CFG.fileType) {
-            case "jpg": var a = SaveAsJPEG(CreateUniqueFileName(parentPath, targetName, "jpg"), CFG.jpgQuality); break;
-            case "tif": var a = SaveAsTIFF(CreateUniqueFileName(parentPath, targetName, "tif")); break;
-            case "psd": var a = SaveAsPSD(CreateUniqueFileName(parentPath, targetName, "psd")); break;
-        }
+        if (!saveWithPhotoshopDialog()) return 'cancel'
 
+        commitSeqState(true)
         var d = objectToDescriptor(CFG, strMessage)
         app.putCustomOptions(GUID, d)
         app.playbackParameters = d
+        return
     }
-    // exit script  
-}
-else  // если запущено из палитры
-{
 
+    // run/edit from Actions palette
     var d = app.playbackParameters
     descriptorToObject(CFG, d, strMessage)
 
-    if (app.playbackDisplayDialogs == DialogModes.ALL) {
-        //double click from action
+    if (app.playbackDisplayDialogs == DialogModes.ALL)
+    {
+        // double click / edit action step
         initSeq(true)
-        strOk = strOkAlt
-        var w = buildWindow(); var result = w.show()
+        var oldSequenceId = CFG.sequenceId
+        var w = buildWindow(true)
+        var result = w.show()
 
-        if (result == cancelButtonID) { return 'cancel' } else // if cancelled
-        {
-            app.eraseCustomOptions(CFG.sequenceId);
-            // сохранить введенные настройки
-            generateUUID()
+        if (result == cancelButtonID) return 'cancel'
+        var didSave = result == saveButtonID
+        if (didSave && !saveWithPhotoshopDialog()) return 'cancel'
 
-            var d = objectToDescriptor(CFG, strMessage)
-            app.playbackParameters = d
-
-            putSeqSettings(CFG.sequenceId, CFG.renameFileOpt)
+        // "Save settings" changes only naming/path rules; "Save again" also refreshes save descriptor.
+        if (oldSequenceId != "") {
+            try { app.eraseCustomOptions(oldSequenceId) } catch (e) {}
+            try { app.eraseCustomOptions(oldSequenceId + "_docID") } catch (e) {}
         }
+        generateUUID()
+
+        var d = objectToDescriptor(CFG, strMessage)
+        app.playbackParameters = d
+        commitSeqState(didSave)
+        return
     }
 
-    if (app.playbackDisplayDialogs != DialogModes.ALL)  // run by button "play" with saved in palette settings (быстрый запуск с сохраненными настройками)
-    {
-            initSeq () 
-            var parentPath = ""  
-            var newPath = createName(CFG.subFolderOpt, cacheFld)
+    // silent action playback
+    initSeq()
+    if (CFG.saveDescriptor == "") {
+        alert(msgNoSaveDescriptor)
+        return
+    }
 
-            if (CFG.newFolder == true && CFG.path !="") {parentPath = CFG.path} else {if (metadata.curPath!="") {parentPath = metadata.curPath} else{alert (msgSave);return}}
-            if (CFG.createSubFolder && newPath!="") parentPath  +=sysDiv + newPath
-         
-            var targetName = createName(CFG.renameFileOpt, cacheFle) 
-            if (targetName == "" || CFG.renameFile == false ) targetName = metadata.curFilename
-            
-            switch (CFG.fileType)
-            {
-                case "jpg": var a = SaveAsJPEG(CreateUniqueFileName (parentPath,targetName, "jpg"), CFG.jpgQuality); break;
-                case "tif": var a = SaveAsTIFF(CreateUniqueFileName (parentPath,targetName, "tif" )); break;
-                case "psd": var a = SaveAsPSD(CreateUniqueFileName (parentPath,targetName, "psd")); break;
-             }
-
-               putSeqSettings (CFG.sequenceId, CFG.renameFileOpt )
-        }
-    // next code  
-} 
+    if (saveWithStoredDescriptor()) {
+        commitSeqState(true)
+    }
 }
-
 ////////////////////////////////////////////////////////////////////////////////////
 // конструктор главного окна программы
 ///////////////////////////////////////////////////////////////////////////////////
-function buildWindow ()
+function buildWindow (editMode)
 {
 var wn = new Window("dialog"); 
-    wn.text = strMessage + " " + rev; 
+    wn.text = strMessage + " " + ver; 
     wn.orientation = "column"; 
     wn.alignChildren = ["fill","top"]; 
     wn.spacing = 10; 
@@ -246,99 +237,40 @@ var wn = new Window("dialog");
 
 // PN1
 // ===
-var pn1 = wn.add("panel"); 
-    pn1.text = strSaveFile; 
-    pn1.orientation = "row"; 
-    pn1.alignChildren = ["center","top"]; 
-    pn1.spacing = 10; 
-    pn1.margins = 10; 
+var pn1 = wn.add("panel");
+    pn1.text = strFolderDest;
+    pn1.orientation = "row";
+    pn1.alignChildren = ["left","center"];
+    pn1.spacing = 10;
+    pn1.margins = 10;
 
-// GR10
-// ====
-var gr10 = pn1.add("group"); 
-    gr10.orientation = "row"; 
-    gr10.alignChildren = ["center","fill"]; 
-    gr10.spacing = 10; 
-    gr10.margins = 0; 
+// left column: destination mode + browse
+var gr1 = pn1.add("group");
+    gr1.orientation = "row";
+    gr1.alignChildren = ["left","center"];
+    gr1.spacing = 10;
 
-// PN2
-// ===
-var pn2 = gr10.add("panel"); 
-    pn2.text = strFolderDest; 
-    pn2.preferredSize.width = 300; 
-    pn2.orientation = "column"; 
-    pn2.alignChildren = ["fill","top"]; 
-    pn2.spacing = 10; 
-    pn2.margins = 10; 
+var dl1_array = [strInSameFolder,strNewPath];
+var dl1 = gr1.add("dropdownlist", undefined, dl1_array);
+    dl1.preferredSize.width = 210;
+var bn1 = gr1.add("button");
+    bn1.text = strBrowse;
+    bn1.justify = "center";
+    bn1.preferredSize.width = 75;
 
-// GR1
-// ===
-var gr1 = pn2.add("group"); 
-    gr1.orientation = "row"; 
-    gr1.alignChildren = ["left","center"]; 
-    gr1.spacing = 10; 
-    gr1.margins = 0; 
+// right column: resolved path + stored Photoshop format
+var gr2 = pn1.add("group");
+    gr2.orientation = "row";
+    gr2.alignChildren = ["left","center"];
+    gr2.spacing = 8;
 
-var dl1_array = [strInSameFolder,strNewPath]; 
-var dl1 = gr1.add("dropdownlist", undefined, dl1_array); 
-      dl1.preferredSize.width = 210;
-var bn1 = gr1.add("button"); 
-    bn1.text = strBrowse
-    bn1.justify = "center"; 
-    bn1.preferredSize.width = 75
-    
-// GR2
-// ===
-var gr2 = pn2.add("group"); 
-    gr2.orientation = "row"; 
-    gr2.alignChildren = ["left","center"]; 
-    gr2.spacing = 10; 
-    gr2.margins = 0; 
+var et1 = gr2.add("edittext", undefined,"",{readonly:true});
+    et1.preferredSize.width = 300;
+var stFormatLabel = gr2.add("statictext", undefined, strFormat);
+var stFormatValue = gr2.add("statictext");
+    stFormatValue.preferredSize.width = 110;
 
-var et1 = gr2.add("edittext", undefined,"",{readonly:true}); 
-    et1.preferredSize.width =295; 
-
-    if (et1.preferredSize.height > dl1.preferredSize.height) {h = et1.preferredSize.height } else { h =  dl1.preferredSize.height}
-// PN3
-// ===
-var pn3 = gr10.add("panel"); 
-    pn3.text = strFileType; 
-    pn3.orientation = "column"; 
-    pn3.alignChildren = ["fill","top"]; 
-    pn3.spacing = 10; 
-    pn3.margins = 10; 
-
-// GR3
-// ===
-var gr3 = pn3.add("group"); 
-    gr3.orientation = "row"; 
-    gr3.alignChildren = ["left","top"]; 
-    gr3.spacing = 10; 
-    gr3.margins = 0; 
-    gr3.alignment = ["fill","top"]; 
-
-// GR4
-// ===
-var gr4 = gr3.add("group"); 
-    gr4.orientation = "row"; 
-    gr4.alignChildren = ["left","center"]; 
-    gr4.spacing = 10; 
-    gr4.margins = 0; 
-
-var st1 = gr4.add("statictext"); 
-    st1.text = strSaveAs; 
-    st1.preferredSize.width = 200; 
-
-// GR5
-// ===
-var gr5 = gr3.add("group"); 
-    gr5.orientation = "row"; 
-    gr5.alignChildren = ["right","center"]; 
-    gr5.spacing = 10; 
-    gr5.margins = 0; 
-
-var dl2_array = ["jpg","psd","tif"]; 
-var dl2 = gr5.add("dropdownlist", undefined, dl2_array); 
+var h = et1.preferredSize.height > dl1.preferredSize.height ? et1.preferredSize.height : dl1.preferredSize.height;
 
 // =========================================
   // preset module
@@ -479,12 +411,19 @@ var gr9 = wn.add("group");
     gr9.margins = 0; 
     gr9.alignment = ["center","top"]; 
 
-var bnOk = gr9.add("button"); 
-    bnOk.text = strOk; 
-    bnOk.justify = "center"; 
+var bnSettings = null;
+if (editMode) {
+    bnSettings = gr9.add("button");
+    bnSettings.text = strOkAlt;
+    bnSettings.justify = "center";
+}
 
-var bnCancel = gr9.add("button",undefined, strCancel, {name: "cancel"}); 
-    bnCancel.justify = "center"; 
+var bnOk = gr9.add("button");
+    bnOk.text = editMode ? strSaveAgain : strOk;
+    bnOk.justify = "center";
+
+var bnCancel = gr9.add("button",undefined, strCancel, {name: "cancel"});
+    bnCancel.justify = "center";
 
 // ======================================================
 // preset functions
@@ -590,45 +529,42 @@ bnRefresh.onClick = function () {dlPreset.onChange()}
 // wimdow files functions
 // ======================================================
 
-    bnOk.onClick = function () {
-        wn.close()
+    bnOk.onClick = function () { wn.close(saveButtonID) }
+    if (bnSettings) bnSettings.onClick = function () { wn.close(settingsButtonID) }
+
+    function setSaveButtonsEnabled(v) {
+        bnOk.enabled = Boolean(v)
+        if (bnSettings) bnSettings.enabled = Boolean(v) && CFG.saveDescriptor != ""
     }
 
-dl1.onChange = function () 
+dl1.onChange = function ()
 {
-    bn1.enabled= Boolean (this.selection.index)
-    CFG.newFolder =Boolean(this.selection.index)
-     
-    if (!Boolean (this.selection.index)) 
-        {if (metadata.curPath !="") {et1.text = metadata.curPath;et1.helpTip = metadata.curPath;bnOk.enabled=true} else {et1.text = "";et1.helpTip =""; bnOk.enabled=false}}
-    else 
-    {
-        if (CFG.path!="") 
-        {var fol = new Folder (CFG.path) 
-            if (fol.exists) {
-                et1.text = CFG.path
-                et1.helpTip = CFG.path
-                bnOk.enabled=true} 
-            else {
-               dl1.selection = 0
-               CFG.path=""
-             }
-            } 
-            else {bn1.onClick()}
-        } 
-}
+    bn1.enabled = Boolean(this.selection.index)
+    CFG.newFolder = Boolean(this.selection.index)
 
-dl2.onChange = function () {
-    
-    CFG.fileType = this.selection.text;
-    
-    if (renew) collectSubfolderSettings (tb1)
-    if (renew) collectSubfolderSettings (tb2)
-   
-    if (pn3.children.length >1) pn3.remove (pn3.children[1])
-    
-    if (!Boolean(this.selection.index)){addJpgOpt (pn3)}else{addPsdOpt (pn3)}
-  }
+    if (!Boolean(this.selection.index))
+    {
+        if (metadata.curPath != "") {
+            et1.text = metadata.curPath
+            et1.helpTip = metadata.curPath
+            setSaveButtonsEnabled(true)
+        } else {
+            et1.text = ""
+            et1.helpTip = ""
+            setSaveButtonsEnabled(false)
+        }
+    }
+    else
+    {
+        if (CFG.path != "") {
+            et1.text = CFG.path
+            et1.helpTip = CFG.path
+            setSaveButtonsEnabled(true)
+        } else {
+            bn1.onClick()
+        }
+    }
+}
 
 bn1.onClick = function ()
 {
@@ -638,7 +574,7 @@ bn1.onClick = function ()
     {CFG.path = userSelectedFolder.fsName
        et1.text = CFG.path
        et1.helpTip = CFG.path
-       bnOk.enabled=true}
+       setSaveButtonsEnabled(true)}
 }
 
 ch2.onClick = function ()
@@ -712,8 +648,8 @@ bnResetFile.onClick = function (){
         if (tb2.children.length == 2) tb2.children[1].children[0].children[1].enabled = false
 
         if (CFG.path != "") { dl1.selection = Number(CFG.newFolder) } else { dl1.selection = 0 }; dl1.onChange()
-        dl2.selection = dl2.find(CFG.fileType); pn3.label = dl2.selection.text; dl2.onChange()
-        
+        stFormatValue.text = getStoredFormatLabel()
+
         stNew.text = makePath(CFG.renameFileOpt, CFG.subFolderOpt)
         ch2.value = CFG.createSubFolder; ch2.onClick()
         ch3.value = CFG.renameFile; ch3.onClick()
@@ -733,86 +669,6 @@ bnResetFile.onClick = function (){
 
         for (var i = 0; i < items.length; i++) { dlPreset.add('item', items[i].key) }
     }
-
-////////////////////////////////////////////////////////////////////////////////////
-// настройки jpg
-///////////////////////////////////////////////////////////////////////////////////
-
-function addJpgOpt (parent)
-{
-    // GR6
-    // ===
-    var gr6 = parent.add("group"); 
-        gr6.orientation = "row"; 
-        gr6.alignChildren = ["left","fill"]; 
-        gr6.spacing = 10; 
-        gr6.margins = 0; 
-    // GR7
-    // ===
-    var gr7 = gr6.add("group"); 
-        gr7.orientation = "row"; 
-        gr7.alignChildren = ["left","top"]; 
-        gr7.spacing = 10; 
-        gr7.margins = 0; 
-
-    var st2 = gr7.add("statictext"); 
-        st2.text =strJpgQuality
-
-    var st3 = gr7.add("statictext"); 
-        st3.text = "12"; 
-        st3.preferredSize.width = 30; 
-        st3.justify = "center"; 
-
-    // GR8
-    // ===
-    var gr8 = gr6.add("group"); 
-        gr8.orientation = "row"; 
-        gr8.alignChildren = ["right","top"]; 
-        gr8.spacing = 10; 
-        gr8.margins = 0; 
-
-    var sl1 = gr8.add("slider"); 
-        sl1.minvalue = 1; 
-        sl1.maxvalue = 12; 
-        sl1.preferredSize.width = parent.preferredSize.width - st3.preferredSize.width - st2.preferredSize.width-50 ; 
-        sl1.value = 12; 
-
-        sl1.addEventListener ('keyup', commonHandler)
-        sl1.addEventListener ('mouseup', commonHandler)
-        sl1.addEventListener ('mouseout', commonHandler)
-
-        function commonHandler(evt) {CFG.jpgQuality = sl1.value = st3.text = Math.round (sl1.value)}
-
-        sl1.onChanging = function () {CFG.jpgQuality = st3.text = Math.round(Number(this.value))}
-
-        sl1.value = CFG.jpgQuality; sl1.onChanging ()
-
-        wn.layout.layout (true)
- }
-
-////////////////////////////////////////////////////////////////////////////////////
-// настройки psd
-///////////////////////////////////////////////////////////////////////////////////
-
-function addPsdOpt (parent)
-{
-    // GR11
-    // ====
-    var gr11 = parent.add("group"); 
-        gr11.orientation = "row"; 
-        gr11.alignChildren = ["left","center"]; 
-        gr11.spacing = 10; 
-        gr11.margins = 0; 
-
-    var ch1 = gr11.add("checkbox"); 
-        ch1.text = strFlatten
-        
-        ch1.onClick = function () {CFG.flatten=Boolean (this.value)}
-        ch1.value = Number (CFG.flatten)
-        
-        wn.layout.layout (true)
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 // панель управления каталогами и 
@@ -1239,7 +1095,7 @@ var dropdown13 = grOpt.add("dropdownlist", undefined, dropdown13_array);
    dropdown13.onChange = function () {if (renew) collectSubfolderSettings(grOpt.parent.parent)}
    
  edittext2.onChanging = function () {
-     this.text = this.text.replace(/[^0-9{2}]/g, "");
+     this.text = this.text.replace(/[^0-9]/g, "");
      if (this.text.length>5) this.text=this.text.substr (0, 5)
      if (renew) collectSubfolderSettings(grOpt.parent.parent)
      }
@@ -1287,9 +1143,6 @@ function Config ()
 {
     this.newFolder = false
     this.path = ""
-    this.fileType = "jpg"
-    this.jpgQuality = 12
-    this.flatten = false
     this.subFolderOpt = "1"
     this.createSubFolder = false
     this.renameFile = true
@@ -1297,27 +1150,37 @@ function Config ()
     this.sequenceId = ""
     this.replace = true
     this.preset = ""
+    this.saveDescriptor = ""
 }
+
+var descriptorKeys = [
+    "newFolder", "path",
+    "createSubFolder", "subFolderOpt",
+    "renameFile", "renameFileOpt",
+    "sequenceId", "replace", "preset"
+]
 
 function objectToDescriptor (o, s) 
 {
-	var d = new ActionDescriptor;
-	var l = o.reflect.properties.length;
-	d.putString( app.charIDToTypeID( 'Msge' ), s);
-	for (var i = 0; i < l; i++ ) {
-		var k = o.reflect.properties[i].toString();
-		if (k == "__proto__" || k == "__count__" || k == "__class__" || k == "reflect") continue;
-		var v = o[ k ];
-		k = app.stringIDToTypeID(k);
-		switch ( typeof(v) ) {
-			case "boolean": d.putBoolean(k, v); break;
-			case "string": d.putString(k, v); break;
-			case "number": d.putInteger(k, v); break;
-             default: $.writeln (typeof(v)); break;
-		}
-           // $.writeln ('put ' + typeof(v) + ' "' + typeIDToStringID(k)  +'": ' + v)
-	}
-    return d;
+    var d = new ActionDescriptor
+    d.putString(app.charIDToTypeID('Msge'), s)
+
+    for (var i = 0; i < descriptorKeys.length; i++) {
+        var name = descriptorKeys[i]
+        if (!o.hasOwnProperty(name)) continue
+        var v = o[name]
+        var key = app.stringIDToTypeID(name)
+        switch (typeof(v)) {
+            case "boolean": d.putBoolean(key, v); break
+            case "string": d.putString(key, v); break
+            case "number": d.putInteger(key, v); break
+        }
+    }
+
+    // Readable summary first, then the internal reusable Photoshop save data.
+    d.putString(app.stringIDToTypeID("saveFormat"), getStoredFormatLabelText())
+    d.putString(app.stringIDToTypeID("saveDescriptor"), o.saveDescriptor)
+    return d
 }
 
 function descriptorToObject (o, d, s) 
@@ -1331,7 +1194,8 @@ function descriptorToObject (o, d, s)
 	for (var i = 0; i < l; i++ ) {
 		var k = d.getKey(i); // i + 1 ?
 		var t = d.getType(k);
-		strk = app.typeIDToStringID(k);
+		var strk = app.typeIDToStringID(k);
+        if (!o.hasOwnProperty(strk)) continue;
 		switch (t) {
 			case DescValueType.BOOLEANTYPE:
 				o[strk] = d.getBoolean(k);
@@ -1340,7 +1204,7 @@ function descriptorToObject (o, d, s)
 				o[strk] = d.getString(k);
 				break;
 			case DescValueType.INTEGERTYPE:
-				o[strk] = d.getDouble(k);
+				o[strk] = d.getInteger(k);
 				break;
 		}
       //  $.writeln ('get ' + typeof(o[strk]) + ' "' + strk  +'": ' + o[strk])
@@ -1476,7 +1340,7 @@ function createName (s, cached)
          case 2: if (cached[i].s !="" && useCache) {c+=cached[i].s} else {cache= grDate (tmp); c += cache; cached[i].s = cache; cached[i].arg = s[i]}; break;
          case 3: if (cached[i].s !="" && useCache) {c+=cached[i].s} else {cache= grText (tmp); c += cache; cached[i].s = cache; cached[i].arg = s[i]}; break;
          case 4: c = grReplace (tmp,c); break;
-         case 5: if (cached[i].s !="" && useCache) {c+=cached[i].s} else { if (Number(tmp[1])==Number(tmp[1])) {cache= grpSeq (tmp)} else {cache= grSubfolder (tmp)}; c += cache; cached[i].s = cache; cached[i].arg = s[i]}; break;
+         case 5: if (cached[i].s !="" && useCache) {c+=cached[i].s} else { cache = (cached == cacheFle) ? grpSeq(tmp) : grSubfolder(tmp); c += cache; cached[i].s = cache; cached[i].arg = s[i]}; break;
          }
      
         useCache = false
@@ -1486,11 +1350,11 @@ function createName (s, cached)
 function grName (s)
 {
     var c = ""
-        switch (Number(tmp[1]))  
+        switch (Number(s[1]))  
         {
             case 0: c= metadata.curFilename; break;
             case 1: c =metadata.lrName; break;
-            case 2: c =metadata.curExt; break;
+            case 2: c = getPreferredSaveExtension(); break;
             case 3: c =metadata.parentPath; break;
             case 4: c =metadata.parentOfParentPath; break;
             case 5: c =metadata.author; break;
@@ -1498,18 +1362,18 @@ function grName (s)
             case 7: c =metadata.camera; break;
         }
     
-        switch (Number(tmp[2]))  
+        switch (Number(s[2]))  
         {
             case 1: c= c.toUpperCase(); break;
             case 2: c =c.toLowerCase(); break;
         }
     
-            switch (Number(tmp[3]))  
+            switch (Number(s[3]))  
         {
-            case 1: c =trim(c.replace(/[^ А-яёЁA-z]/g, "")); break;
+            case 1: c =trim(c.replace(/[^ А-Яа-яЁёA-Za-z]/g, "")); break;
             case 2: c =trim(c.replace(/[^0-9]/g, "")); break;    
-            case 3: c =trim(c.replace(/[^ A-z]/g, "")); break;
-            case 4: c =trim(c.replace(/[^ А-яёЁ]/g, "")); break;
+            case 3: c =trim(c.replace(/[^ A-Za-z]/g, "")); break;
+            case 4: c =trim(c.replace(/[^ А-Яа-яЁё]/g, "")); break;
             case 5: c =translit (c, true); break;
             case 6: c =translit (c, false); break;
         }
@@ -1542,23 +1406,24 @@ function grSize (s)
 function getSize (mode, units, div)
 {
     var oldPref = app.preferences.rulerUnits
-    app.preferences.rulerUnits = units
-
-    var a = metadata.doc.width
-    var b = metadata.doc.height
     var c = ""
-    switch (Number (mode))
-    {
-        case 0: if (a.value > b.value) {c = round (a, div) + 'x' + round (b, div)} else {c = round (b, div) + 'x' + round (a, div)}; break;
-        case 1: if (a.value < b.value) {c = round (a, div) + 'x' + round (b, div)} else {c = round (b, div) + 'x' + round (a, div)}; break;
-        case 2: c = round (a, div) + 'x' + round (b, div); break;
-        case 3: c = round (a, div); break;
-        case 4: c = round (b, div); break;
-        case 5: if (units == Units.CM) {c = round(metadata.doc.resolution,div)} else {c = round(metadata.doc.resolution/2.54,div)}; break;
-     }
+    try {
+        app.preferences.rulerUnits = units
 
-
-    app.preferences.rulerUnits = oldPref   
+        var a = metadata.doc.width
+        var b = metadata.doc.height
+        switch (Number (mode))
+        {
+            case 0: if (a.value > b.value) {c = round (a, div) + 'x' + round (b, div)} else {c = round (b, div) + 'x' + round (a, div)}; break;
+            case 1: if (a.value < b.value) {c = round (a, div) + 'x' + round (b, div)} else {c = round (b, div) + 'x' + round (a, div)}; break;
+            case 2: c = round (a, div) + 'x' + round (b, div); break;
+            case 3: c = round (a, div); break;
+            case 4: c = round (b, div); break;
+            case 5: if (units == Units.CM) {c = round(metadata.doc.resolution,div)} else {c = round(metadata.doc.resolution/2.54,div)}; break;
+        }
+    } finally {
+        app.preferences.rulerUnits = oldPref
+    }
 
     function round (val, mode)
     {
@@ -1611,7 +1476,7 @@ function grDate (s)
         case 6:  c=c.concat (dt.DD,div,dt.MM); break;       
         case 7:  c=c.concat (dt.hh,div,dt.mm,div, dt.ss ); break;
         case 8:  c=c.concat (dt.hh,div,dt.mm); break;
-        case 9:  c=c.concat (dt.mm,div,dt.ss); break;
+        case 9:  c=c.concat (dt.hh,div,dt.ss); break;
         case 10:  c=dt.YY; break;
         case 11:  c=dt.MM; break;
         case 12:  c=dt.DD; break;
@@ -1745,7 +1610,9 @@ function makePath (fle, fld)
     if (fle == "" || CFG.renameFile == false ) fle = metadata.curFilename
     if (fld != "") {fld = fld  + sysDiv}
     
-    if (CFG.createSubFolder) {s=fld + fle + '.' + CFG.fileType} else {s=fle+ '.' + CFG.fileType}
+    var ext = getPreferredSaveExtension()
+    var suffix = ext != "" ? "." + ext : ""
+    if (CFG.createSubFolder) {s=fld + fle + suffix} else {s=fle + suffix}
     if ( $.os.search(/windows/i) != -1 ) {s=s.replace(/\\+/g, '$1\\')} else {s=s.replace(/\/+/g, '$1/')}
     if ( $.os.search(/windows/i) != -1 ) {s=s.replace(/^\\+/, '')} else {s=s.replace(/^\/+/g, '')}  
 
@@ -1753,19 +1620,25 @@ function makePath (fle, fld)
 }
 function Metadata ()
 {
-    try {doc = app.activeDocument } catch (e) {return}
+    try {var doc = app.activeDocument } catch (e) {return}
     this.doc = doc
     this.curFilename = doc.name.lastIndexOf(".") != -1 ? doc.name.substr(0, doc.name.lastIndexOf(".")) : doc.name //curFilename
     try { this.curPath = doc.path.fsName } catch (e) { this.curPath = "" }  //curPath
-    this.curExt = CFG.fileType //curExt
+    this.curExt = doc.name.lastIndexOf(".") != -1 ? doc.name.substr(doc.name.lastIndexOf(".") + 1) : "" //curExt
     this.lrName = doc.activeLayer.name //lrName
     try {var pth = doc.path.fsName.replace(":","").split(sysDiv)} catch (e) {var pth = []}
     var shift = pth[pth.length - 1] == "" ? 1 : 0
     this.parentPath = pth.length >= 1+shift ? pth[pth.length - (1 +shift)] : ""//parentPath
     this.parentOfParentPath =  pth.length >= 2+shift ? pth[pth.length - (2+shift)] : ""  //parent of parent
-    this.author = doc.info.author    //author
-    this.title = doc.info.title // title
-    for (var i = 0; i < doc.info.exif.length; i++) { var tmp = doc.info.exif[i]; if (tmp[0] == "Model") { this.camera = tmp[1]; break } } //camera
+    this.author = doc.info.author || ""    //author
+    this.title = doc.info.title || "" // title
+    this.camera = ""
+    try {
+        for (var i = 0; i < doc.info.exif.length; i++) {
+            var tmp = doc.info.exif[i]
+            if (tmp[0] == "Model") { this.camera = tmp[1] || ""; break }
+        }
+    } catch (e) {} //camera
     try { var fl = File(doc.fullName); this.created = fl.created; this.modified = fl.modified } catch (e) { this.created = this.modified = new Date } //created  //modified
 }
 
@@ -1795,7 +1668,7 @@ function initSeq (editMode)
                          switch (Number (seq[3]))
                          {
                              case 0: seq[1]= Number(seq[1])+1; break;
-                             case 1: if (String(metadata.doc.id) != getSeqSettings("docID")) {seq[1]= Number(seq[1])+1}; break;
+                             case 1: if (String(metadata.doc.id) != getSeqSettings(String(CFG.sequenceId) + "_docID")) {seq[1]= Number(seq[1])+1}; break;
                           }    
                              if (seq[1]==100000) seq[1] = 0
                       } 
@@ -1805,59 +1678,291 @@ function initSeq (editMode)
                  }
                 s = s.substr (0, s.length-1)
                 
-                putSeqSettings ("docID", metadata.doc.id) // записать id документа
-                
                 CFG.renameFileOpt = s             
           } 
  }
 
-function SaveAsJPEG( inFileName, inQuality) {
-    var hs = app.activeDocument.activeHistoryState
-	var jpegOptions = new JPEGSaveOptions();
-	jpegOptions.quality = inQuality;
-     app.activeDocument.flatten()
-	app.activeDocument.saveAs ( File( inFileName ), jpegOptions, true );
-     app.activeDocument.activeHistoryState = hs
+function saveWithPhotoshopDialog()
+{
+    var target = buildTargetFile()
+    if (!target) return false
+
+    // Prefer Save a Copy semantics. In older Photoshop versions the same save event
+    // may expose only the legacy Save As workflow. If copy mode itself fails, retry
+    // interactively without the copy flag and remember that mode for action playback.
+    var d = CFG.saveDescriptor != "" ? descriptorFromBase64(CFG.saveDescriptor) : new ActionDescriptor()
+    prepareSaveDescriptor(d, target, true)
+
+    var result
+    var mode = "copy"
+    try {
+        result = executeAction(s2t("save"), d, DialogModes.ALL)
+    } catch (e) {
+        if (isUserCancel(e)) return false
+
+        var fallback = CFG.saveDescriptor != "" ? descriptorFromBase64(CFG.saveDescriptor) : new ActionDescriptor()
+        prepareSaveDescriptor(fallback, target, false)
+        try {
+            result = executeAction(s2t("save"), fallback, DialogModes.ALL)
+            mode = "saveAs"
+        } catch (e2) {
+            if (isUserCancel(e2)) return false
+            throw e2
+        }
+    }
+
+    var captured = hasSaveFormat(result) ? result : null
+    if (!captured) {
+        alert(msgCaptureSave)
+        return false
+    }
+
+    prepareStoredSaveDescriptor(captured, mode == "copy")
+    CFG.saveDescriptor = descriptorToBase64(captured)
+    return true
 }
 
-function SaveAsPSD( inFileName) {
-     if (CFG.flatten) var hs = app.activeDocument.activeHistoryState
-	var psdSaveOptions = new PhotoshopSaveOptions();
-    if (CFG.flatten) app.activeDocument.flatten()
-	app.activeDocument.saveAs( File( inFileName ), psdSaveOptions, true);
-     if (CFG.flatten) app.activeDocument.activeHistoryState = hs
+function saveWithStoredDescriptor()
+{
+    if (CFG.saveDescriptor == "") {
+        alert(msgNoSaveDescriptor)
+        return false
+    }
+
+    var target = buildTargetFile()
+    if (!target) return false
+
+    var d = descriptorFromBase64(CFG.saveDescriptor)
+    var useCopy = descriptorUsesCopy(d)
+    prepareSaveDescriptor(d, target, useCopy)
+
+    // Do not retry a silent action save with another method: an error here can mean
+    // a bad path, permissions, disk space, etc. Falling back could unexpectedly rebind
+    // the open document to a new file. The fallback is selected only during interactive capture.
+    executeAction(s2t("save"), d, DialogModes.NO)
+    return true
 }
 
-function SaveAsTIFF( inFileName) {
-    if (CFG.flatten) var hs = app.activeDocument.activeHistoryState
-	var tiffSaveOptions = new TiffSaveOptions();
-    tiffSaveOptions.imageCompression = TIFFEncoding.NONE;
-     if (CFG.flatten) app.activeDocument.flatten()
-	app.activeDocument.saveAs( File( inFileName ), tiffSaveOptions,true);
-    if (CFG.flatten) app.activeDocument.activeHistoryState = hs
+function prepareSaveDescriptor(d, target, useCopy)
+{
+    // Remove document-specific values captured by Photoshop; keep format/options and replace only destination.
+    try { d.erase(s2t("documentID")) } catch (e) {}
+    try { d.erase(s2t("saveStage")) } catch (e) {}
+    d.putPath(s2t("in"), target)
+    try { d.erase(s2t("copy")) } catch (e) {}
+    if (useCopy) d.putBoolean(s2t("copy"), true)
 }
 
-function CreateUniqueFileName(inParentPath, inFileName, inFileExt) {
-
-    if ( $.os.search(/windows/i) != -1 )  {inParentPath=inParentPath.replace(/\\+/g, '$1\\')} else  {inParentPath=inParentPath.replace(/\/+/g, '$1/')}
-    if ( $.os.search(/windows/i) != -1 ) {inParentPath=inParentPath.replace(/\\$/,"")} else {inParentPath=inParentPath.replace(/\/$/,"") }
-    if (inParentPath.indexOf(sysDiv,0) == 0) inParentPath = sysDiv + inParentPath
-    
-    var fld = new Folder (inParentPath)
-    if (!fld.exists) fld.create()
-    
-	var uniqueFileName =inParentPath + sysDiv+ inFileName + '.' + inFileExt
-    
-  if (CFG.replace == false)
-   {
-	var fileNumber = 1;
-	while ( File( uniqueFileName ).exists ) {
-		uniqueFileName = inParentPath +  sysDiv + inFileName + "_" + fileNumber +  '.' + inFileExt;
-		fileNumber++;
-	}
-
+function prepareStoredSaveDescriptor(d, useCopy)
+{
+    try { d.erase(s2t("documentID")) } catch (e) {}
+    try { d.erase(s2t("saveStage")) } catch (e) {}
+    try { d.erase(s2t("copy")) } catch (e) {}
+    if (useCopy) d.putBoolean(s2t("copy"), true)
 }
-	return uniqueFileName;
+
+function descriptorUsesCopy(d)
+{
+    try {
+        var key = s2t("copy")
+        return d.hasKey(key) && d.getBoolean(key)
+    } catch (e) { return false }
+}
+
+function hasSaveFormat(d)
+{
+    try { return d != undefined && d.count > 0 && d.hasKey(s2t("as")) } catch (e) { return false }
+}
+
+function buildTargetFile()
+{
+    var parentPath = ""
+    var newPath = createName(CFG.subFolderOpt, cacheFld)
+
+    if (CFG.newFolder == true && CFG.path != "") parentPath = CFG.path
+    else parentPath = metadata.curPath
+
+    if (parentPath == "") {
+        alert(msgSave)
+        return null
+    }
+
+    if (CFG.createSubFolder && newPath != "") parentPath += sysDiv + newPath
+    if (!ensureFolder(parentPath)) throw new Error(localize(msgCreateFolder, parentPath))
+
+    var targetName = createName(CFG.renameFileOpt, cacheFle)
+    if (targetName == "" || CFG.renameFile == false) targetName = metadata.curFilename
+    targetName = sanitizeFileName(targetName)
+
+    return File(CreateUniqueFileName(parentPath, targetName, getPreferredSaveExtension()))
+}
+
+function ensureFolder(path)
+{
+    var fld = new Folder(path)
+    if (fld.exists) return true
+
+    var parent = fld.parent
+    if (parent && !parent.exists && parent.fsName != fld.fsName) {
+        if (!ensureFolder(parent.fsName)) return false
+    }
+    return fld.create() || fld.exists
+}
+
+function CreateUniqueFileName(inParentPath, inFileName, inFileExt)
+{
+    var fld = new Folder(inParentPath)
+    var parent = fld.fsName
+    var suffix = inFileExt != "" ? "." + inFileExt : ""
+    var uniqueFileName = parent + sysDiv + inFileName + suffix
+
+    if (CFG.replace == false) {
+        var fileNumber = 1
+        while (File(uniqueFileName).exists) {
+            uniqueFileName = parent + sysDiv + inFileName + "_" + fileNumber + suffix
+            fileNumber++
+        }
+    }
+    return uniqueFileName
+}
+
+function sanitizeFileName(s)
+{
+    s = String(s).replace(/[\\\/:*?"<>|]/g, "_")
+    if ($.os.search(/windows/i) != -1) s = s.replace(/[ .]+$/, "")
+    return s == "" ? "untitled" : s
+}
+
+function getPreferredSaveExtension()
+{
+    var ext = getStoredSaveExtension()
+    return ext != "" ? ext : metadata.curExt
+}
+
+function getStoredSaveExtension()
+{
+    if (CFG.saveDescriptor == "") return ""
+    try {
+        var d = descriptorFromBase64(CFG.saveDescriptor)
+        var info = getFormatInfo(d)
+        if (info.ext != "") return info.ext
+
+        var key = s2t("in")
+        if (d.hasKey(key)) {
+            var f = d.getPath(key)
+            var n = f.name
+            var pos = n.lastIndexOf(".")
+            if (pos > 0 && pos < n.length - 1) return n.substr(pos + 1).toLowerCase()
+        }
+        return ""
+    } catch (e) { return "" }
+}
+
+function getStoredFormatLabel()
+{
+    if (CFG.saveDescriptor == "") return strNotSet
+    try {
+        var info = getFormatInfo(descriptorFromBase64(CFG.saveDescriptor))
+        if (info.label != "") return info.label
+        var ext = getStoredSaveExtension()
+        return ext != "" ? ext.toUpperCase() : strNotSet
+    } catch (e) { return strNotSet }
+}
+
+function getStoredFormatLabelText()
+{
+    var label = getStoredFormatLabel()
+    try { return localize(label) } catch (e) { return String(label) }
+}
+
+function getFormatInfo(d)
+{
+    var out = {label:"", ext:""}
+    try {
+        var key = s2t("as")
+        if (!d.hasKey(key)) return out
+        var id = d.getObjectType(key)
+        var raw = ""
+        try { raw = typeIDToStringID(id) } catch (e) {}
+        if (raw == "") try { raw = typeIDToCharID(id) } catch (e) {}
+
+        var map = {
+            "JPEG": ["JPEG", "jpg"],
+            "JPEGFormat": ["JPEG", "jpg"],
+            "PNGFormat": ["PNG", "png"],
+            "TIFF": ["TIFF", "tif"],
+            "photoshop35Format": ["PSD", "psd"],
+            "largeDocumentFormat": ["PSB", "psb"],
+            "PDFGenericFormat": ["Photoshop PDF", "pdf"],
+            "CompuServeGIF": ["GIF", "gif"],
+            "BMP": ["BMP", "bmp"],
+            "BMPFormat": ["BMP", "bmp"],
+            "webPFormat": ["WebP", "webp"]
+        }
+        if (map[raw]) { out.label = map[raw][0]; out.ext = map[raw][1] }
+        else out.label = raw
+    } catch (e) {}
+    return out
+}
+
+function descriptorToBase64(d)
+{
+    return base64Encode(d.toStream())
+}
+
+function descriptorFromBase64(s)
+{
+    var d = new ActionDescriptor()
+    d.fromStream(base64Decode(s))
+    return d
+}
+
+function base64Encode(input)
+{
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    var out = "", i = 0
+    while (i < input.length) {
+        var c1 = input.charCodeAt(i++) & 255
+        var c2 = i < input.length ? input.charCodeAt(i++) & 255 : NaN
+        var c3 = i < input.length ? input.charCodeAt(i++) & 255 : NaN
+        out += chars.charAt(c1 >> 2)
+        out += chars.charAt(((c1 & 3) << 4) | (isNaN(c2) ? 0 : (c2 >> 4)))
+        out += isNaN(c2) ? "=" : chars.charAt(((c2 & 15) << 2) | (isNaN(c3) ? 0 : (c3 >> 6)))
+        out += isNaN(c3) ? "=" : chars.charAt(c3 & 63)
+    }
+    return out
+}
+
+function base64Decode(input)
+{
+    var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    var out = "", i = 0
+    input = String(input).replace(/[^A-Za-z0-9\+\/\=]/g, "")
+    while (i < input.length) {
+        var e1 = chars.indexOf(input.charAt(i++))
+        var e2 = chars.indexOf(input.charAt(i++))
+        var c3ch = input.charAt(i++)
+        var c4ch = input.charAt(i++)
+        var e3 = c3ch == "=" ? 64 : chars.indexOf(c3ch)
+        var e4 = c4ch == "=" ? 64 : chars.indexOf(c4ch)
+
+        var b1 = (e1 << 2) | (e2 >> 4)
+        out += String.fromCharCode(b1 & 255)
+        if (e3 != 64) {
+            var b2 = ((e2 & 15) << 4) | (e3 >> 2)
+            out += String.fromCharCode(b2 & 255)
+        }
+        if (e4 != 64) {
+            var b3 = ((e3 & 3) << 6) | e4
+            out += String.fromCharCode(b3 & 255)
+        }
+    }
+    return out
+}
+
+function isUserCancel(e)
+{
+    return e && (e.number == 8007 || e.number == -128)
 }
 
 function cacheRecord (arg, s)
@@ -1890,6 +1995,12 @@ function getSeqSettings (key)
 {
     try{var d = app.getCustomOptions(key);
     return d.getString(s2t('renameFileOpt'))} catch (e) {return ""}
+}
+
+function commitSeqState (savedDocument)
+{
+    putSeqSettings(CFG.sequenceId, CFG.renameFileOpt)
+    if (savedDocument) putSeqSettings(String(CFG.sequenceId) + "_docID", String(metadata.doc.id))
 }
 
 function translit (s, mode)
@@ -1940,17 +2051,17 @@ function Preset() {
                 break;
         }
 
-        app.eraseCustomOptions('SmartSave')
+        app.eraseCustomOptions(PRESET_KEY)
 
         var d = new ActionDescriptor();
         for (var i = 0; i < output.length; i++) { d.putString(s2t(output[i].key), output[i].val) }
 
-        app.putCustomOptions('SmartSave', d);
+        app.putCustomOptions(PRESET_KEY, d);
     }
 
     this.getPreset = function (key) {
         try {
-            var d = app.getCustomOptions('SmartSave');
+            var d = app.getCustomOptions(PRESET_KEY);
             return d.getString(s2t(key))
         } catch (e) { return "" }
     }
@@ -1958,7 +2069,7 @@ function Preset() {
     this.getPresetList = function () {
         var output = []
         try {
-            var d = app.getCustomOptions('SmartSave');
+            var d = app.getCustomOptions(PRESET_KEY);
 
             for (var i = 0; i < d.count; i++) { output.push({ key: t2s(d.getKey(i)), val: d.getString(d.getKey(i)) }) }
         } catch (e) { }
