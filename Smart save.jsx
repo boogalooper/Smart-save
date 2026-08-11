@@ -1,4 +1,4 @@
-﻿///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 // Smart save
 // jazz-y@ya.ru
 ///////////////////////////////////////////////////////////////////////////////
@@ -33,12 +33,14 @@
 // END__HARVEST_EXCEPTION_ZSTRING
 */ 
 
+(function () {
+
 $.localize = true
 //$.locale = "ru"
 
 //bin here
 var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
-    ver = "0.11",
+    ver = "0.12",
     stCurFilename = { en: "Current filename:", ru: "Текущее имя:" },
     stNewFilname = { en: "New filename:", ru: "Новое имя:" },
     strAddToBegin = { en: "Insert before", ru: "Добавить в начало" },
@@ -159,44 +161,46 @@ if (metadata.hasOwnProperty("doc")) main ()
 
 function main ()
 {
+    var d, w, result, oldSequenceId, didSave
+
     if (!app.playbackParameters.count)
     {
         // normal run / action recording
         try {
-            var d = app.getCustomOptions(GUID)
+            d = app.getCustomOptions(GUID)
             if (d != undefined) descriptorToObject(CFG, d, strMessage)
         } catch (e) {}
 
         initSeq()
         generateUUID()
 
-        var w = buildWindow(false)
-        var result = w.show()
+        w = buildWindow(false)
+        result = w.show()
         if (result == cancelButtonID) return 'cancel'
 
         if (!saveWithPhotoshopDialog()) return 'cancel'
 
         commitSeqState(true)
-        var d = objectToDescriptor(CFG, strMessage)
+        d = objectToDescriptor(CFG, strMessage)
         app.putCustomOptions(GUID, d)
         app.playbackParameters = d
         return
     }
 
     // run/edit from Actions palette
-    var d = app.playbackParameters
+    d = app.playbackParameters
     descriptorToObject(CFG, d, strMessage)
 
     if (app.playbackDisplayDialogs == DialogModes.ALL)
     {
         // double click / edit action step
         initSeq(true)
-        var oldSequenceId = CFG.sequenceId
-        var w = buildWindow(true)
-        var result = w.show()
+        oldSequenceId = CFG.sequenceId
+        w = buildWindow(true)
+        result = w.show()
 
         if (result == cancelButtonID) return 'cancel'
-        var didSave = result == saveButtonID
+        didSave = result == saveButtonID
         if (didSave && !saveWithPhotoshopDialog()) return 'cancel'
 
         // "Save settings" changes only naming/path rules; "Save again" also refreshes save descriptor.
@@ -206,7 +210,7 @@ function main ()
         }
         generateUUID()
 
-        var d = objectToDescriptor(CFG, strMessage)
+        d = objectToDescriptor(CFG, strMessage)
         app.playbackParameters = d
         commitSeqState(didSave)
         return
@@ -228,66 +232,44 @@ function main ()
 ///////////////////////////////////////////////////////////////////////////////////
 function buildWindow (editMode)
 {
-var wn = new Window("dialog"); 
-    wn.text = strMessage + " " + ver; 
-    wn.orientation = "column"; 
-    wn.alignChildren = ["fill","top"]; 
-    wn.spacing = 10; 
-    wn.margins = 16; 
+var wn = new Window("dialog{orientation:'column',alignChildren:['fill','top'],spacing:10,margins:16}");
+    wn.text = strMessage + " " + ver;
 
 // PN1
 // ===
-var pn1 = wn.add("panel");
+var pn1 = wn.add("panel{orientation:'row',alignChildren:['left','center'],spacing:10,margins:10}");
     pn1.text = strFolderDest;
-    pn1.orientation = "row";
-    pn1.alignChildren = ["left","center"];
-    pn1.spacing = 10;
-    pn1.margins = 10;
 
 // left column: destination mode + browse
-var gr1 = pn1.add("group");
-    gr1.orientation = "row";
-    gr1.alignChildren = ["left","center"];
-    gr1.spacing = 10;
+var gr1 = pn1.add("group{orientation:'row',alignChildren:['left','center'],spacing:10}");
 
 var dl1_array = [strInSameFolder,strNewPath];
 var dl1 = gr1.add("dropdownlist", undefined, dl1_array);
     dl1.preferredSize.width = 210;
-var bn1 = gr1.add("button");
+var bn1 = gr1.add("button{preferredSize:[75,-1]}");
     bn1.text = strBrowse;
-    bn1.justify = "center";
-    bn1.preferredSize.width = 75;
 
 // right column: resolved path + stored Photoshop format
-var gr2 = pn1.add("group");
-    gr2.orientation = "row";
-    gr2.alignChildren = ["left","center"];
-    gr2.spacing = 8;
+var gr2 = pn1.add("group{orientation:'row',alignChildren:['left','center'],spacing:8}");
 
-var et1 = gr2.add("edittext", undefined,"",{readonly:true});
-    et1.preferredSize.width = 300;
+var et1 = gr2.add("edittext{preferredSize:[300,-1],properties:{readonly:true}}");
 var stFormatLabel = gr2.add("statictext", undefined, strFormat);
-var stFormatValue = gr2.add("statictext");
-    stFormatValue.preferredSize.width = 110;
+var stFormatValue = gr2.add("statictext{preferredSize:[110,-1]}");
 
 var h = et1.preferredSize.height > dl1.preferredSize.height ? et1.preferredSize.height : dl1.preferredSize.height;
 
 // =========================================
   // preset module
   // =========================================    
-  var grPreset = wn.add("group");
-  grPreset.orientation = "row";
-  grPreset.alignChildren = ["left", "center"];
-  grPreset.spacing = 10;
+  var grPreset = wn.add("group{orientation:'row',alignChildren:['left','center'],spacing:10}");
 
   var dlPreset_array = [strDefailt];
   var dlPreset = grPreset.add("dropdownlist", undefined, undefined, { items: dlPreset_array });
   dlPreset.text = strSet
   dlPreset.preferredSize.width = 300
 
-  var bnRefresh = grPreset.add("button");
+  var bnRefresh = grPreset.add("button{preferredSize:[30,-1]}");
   bnRefresh.text = strReload
-  bnRefresh.preferredSize.width = 30
 
   var bnSave = grPreset.add("button");
   bnSave.text = strPresetSave
@@ -295,8 +277,8 @@ var h = et1.preferredSize.height > dl1.preferredSize.height ? et1.preferredSize.
   var bnSaveAs = grPreset.add("button");
   bnSaveAs.text = strPresetSaveAs
 
-  var bnDel = grPreset.add("button");
-  bnDel.text = strPresetDelete
+  var bnPresetDelete = grPreset.add("button");
+  bnPresetDelete.text = strPresetDelete
 
 
 // TPN1
@@ -330,11 +312,7 @@ tpn1.selection = tb2;
 
 // GRENABLESUBFOLDER
 // =================
-var grEnableSubfolder = tb1.add("group"); 
-    grEnableSubfolder.orientation = "row"; 
-    grEnableSubfolder.alignChildren = ["left","center"]; 
-    grEnableSubfolder.spacing = 10; 
-    grEnableSubfolder.margins = 0; 
+var grEnableSubfolder = tb1.add("group{orientation:'row',alignChildren:['left','center'],spacing:10,margins:0}");
 
 var ch2 = grEnableSubfolder.add("checkbox"); 
     ch2.text = strCreateSub; 
@@ -345,11 +323,7 @@ var bnResetSubfolder = grEnableSubfolder.add("button",undefined, strReset);
 
 // GRENABLERENAMINGFILE
 // =================
-var grEnableFile = tb2.add("group"); 
-    grEnableFile.orientation = "row"; 
-    grEnableFile.alignChildren = ["left","center"]; 
-    grEnableFile.spacing = 10; 
-    grEnableFile.margins = 0; 
+var grEnableFile = tb2.add("group{orientation:'row',alignChildren:['left','center'],spacing:10,margins:0}");
 
 var ch3 = grEnableFile.add("checkbox"); 
     ch3.text = strRenameFile; 
@@ -359,71 +333,48 @@ var ch3 = grEnableFile.add("checkbox");
 
 // PNPREVIEW
 // =========
-var pnPreview = wn.add("panel"); 
-    pnPreview.text = strPreview; 
-    pnPreview.orientation = "column"; 
-    pnPreview.alignChildren = ["left","top"]; 
-    pnPreview.spacing = 10; 
-    pnPreview.margins = 10; 
+var pnPreview = wn.add("panel{orientation:'column',alignChildren:['left','top'],spacing:10,margins:10}");
+    pnPreview.text = strPreview;
 
-var pnLabels = pnPreview.add("group"); 
-       pnLabels.orientation = "row"; 
+var pnLabels = pnPreview.add("group{orientation:'row'}");
        
 // GRTEXT
 // ======
-var grText = pnLabels.add("group"); 
-    grText.orientation = "column"; 
-    grText.alignChildren = ["right","center"]; 
-    grText.spacing = 10; 
-    grText.margins = 0; 
+var grPreviewText = pnLabels.add("group{orientation:'column',alignChildren:['right','center'],spacing:10,margins:0}");
 
-var statictext1 = grText.add("statictext"); 
-    statictext1.text = stCurFilename; 
+var stCurrentLabel = grPreviewText.add("statictext");
+    stCurrentLabel.text = stCurFilename;
 
-var statictext2 = grText.add("statictext"); 
-    statictext2.text = stNewFilname; 
+var stNewLabel = grPreviewText.add("statictext");
+    stNewLabel.text = stNewFilname;
 
 // GRLABELS
 // ========
-var grLabels = pnLabels.add("group"); 
-    grLabels.orientation = "column"; 
-    grLabels.alignChildren = ["left","center"]; 
-    grLabels.spacing = 10; 
-    grLabels.margins = 0; 
+var grLabels = pnLabels.add("group{orientation:'column',alignChildren:['left','center'],spacing:10,margins:0}");
 
-var stOld = grLabels.add("statictext"); 
-   stOld.text = metadata.doc.name
-    stOld.preferredSize.width = 350
+var stOld = grLabels.add("statictext{preferredSize:[350,-1]}");
+    stOld.text = metadata.doc.name
 
-var stNew = grLabels.add("statictext"); 
- //   stNew.text = "StaticText"; 
-    stNew.preferredSize.width = 500
+var stNew = grLabels.add("statictext{preferredSize:[500,-1]}");
 
 var ch4 =  pnPreview.add("checkbox"); 
 ch4.text = strReplace
 
 // GR9
 // ===
-var gr9 = wn.add("group"); 
-    gr9.orientation = "row"; 
-    gr9.alignChildren = ["left","center"]; 
-    gr9.spacing = 10; 
-    gr9.margins = 0; 
-    gr9.alignment = ["center","top"]; 
+var gr9 = wn.add("group{orientation:'row',alignChildren:['left','center'],spacing:10,margins:0,alignment:['center','top']}");
 
 var bnSettings = null;
 if (editMode) {
     bnSettings = gr9.add("button");
     bnSettings.text = strOkAlt;
-    bnSettings.justify = "center";
 }
 
 var bnOk = gr9.add("button");
     bnOk.text = editMode ? strSaveAgain : strOk;
-    bnOk.justify = "center";
 
-var bnCancel = gr9.add("button",undefined, strCancel, {name: "cancel"});
-    bnCancel.justify = "center";
+var bnCancel = gr9.add("button{properties:{name:'cancel'}}");
+    bnCancel.text = strCancel;
 
 // ======================================================
 // preset functions
@@ -433,7 +384,7 @@ dlPreset.onChange = function ()
 {
   if (this.selection.index == 0)
   {
-    bnDel.enabled = false
+    bnPresetDelete.enabled = false
     
     if (renew)
     {
@@ -442,18 +393,18 @@ dlPreset.onChange = function ()
       var a = preset.putSettingsToArray (def)
       preset.putArrayToSettings (CFG, a)
 
-      wn.onShow(true)
+      refreshWindow(true)
     }
   } else 
   {  
-    bnDel.enabled = true
+    bnPresetDelete.enabled = true
 
     if (renew)
     {
       var a = preset.getPreset (this.selection.text)
       preset.putArrayToSettings (CFG, a)
 
-      wn.onShow(true)
+      refreshWindow(true)
     }
   }
     CFG.preset = this.selection.text
@@ -506,7 +457,7 @@ bnSaveAs.onClick = function ()
   preset.checkPresetIntegrity(wn)
 }
 
-bnDel.onClick = function ()
+bnPresetDelete.onClick = function ()
 {
   var a = preset.putSettingsToArray (CFG)
   var nm = dlPreset.selection.text
@@ -612,50 +563,83 @@ bnResetSubfolder.onClick = function (){
     renew = false
     var len = tb1.children.length
     for (var i =1; i<len; i++) { tb1.remove (tb1.children[1])}
+    CFG.subFolderOpt = "1"
     renew = true
-    pnFolderAdd (tb1,"1")
+    pnFolderAdd (tb1, CFG.subFolderOpt)
 }
 
 bnResetFile.onClick = function (){
     renew = false
     var len = tb2.children.length
     for (var i =1; i<len; i++) { tb2.remove (tb2.children[1])}
+    CFG.renameFileOpt = "0"
     renew = true
-    pnFolderAdd (tb2,"0")
+    pnFolderAdd (tb2, CFG.renameFileOpt)
 }
 
-    wn.onShow = function (fromPreset) {
+    function ensureDefaultRows() {
+        if (typeof CFG.subFolderOpt != "string" || CFG.subFolderOpt == "") CFG.subFolderOpt = "1"
+        if (typeof CFG.renameFileOpt != "string" || CFG.renameFileOpt == "") CFG.renameFileOpt = "0"
+    }
+
+    function refreshWindow(fromPreset) {
+        var len, i, tmp, foundPreset
 
         renew = false
+        ensureDefaultRows()
+
         if (!fromPreset) {
-            grDivSubfolder.preferredSize.width = tpn1.preferredSize.width - ch2.preferredSize.width - bnResetSubfolder.preferredSize.width - 50
-            grDivFile.preferredSize.width = tpn1.preferredSize.width - ch3.preferredSize.width - bnResetFile.preferredSize.width - 50
-            loadPresets();
-            dlPreset.selection = dlPreset.find(CFG.preset) != null ? dlPreset.find(CFG.preset) : 0   
-        } else {
-            var len = tb1.children.length
-            for (var i = 1; i < len; i++) { tb1.remove(tb1.children[1]) }
-            var len = tb2.children.length
-            for (var i = 1; i < len; i++) { tb2.remove(tb2.children[1]) }
+            loadPresets()
+            foundPreset = CFG.preset != "" ? dlPreset.find(CFG.preset) : null
+            dlPreset.selection = foundPreset != null ? foundPreset : 0
         }
-        var tmp = CFG.subFolderOpt.split('#')
-        for (var i = 0; i < tmp.length; i++) { pnFolderAdd(tb1, tmp[i]) }
+
+        // Dynamic rows are rebuilt explicitly. Do not depend on Window.onShow:
+        // in some Photoshop/ScriptUI versions it may run too late or not rebuild
+        // controls created after the window resource has been parsed.
+        len = tb1.children.length
+        for (i = 1; i < len; i++) tb1.remove(tb1.children[1])
+        len = tb2.children.length
+        for (i = 1; i < len; i++) tb2.remove(tb2.children[1])
+
+        tmp = CFG.subFolderOpt.split('#')
+        for (i = 0; i < tmp.length; i++) pnFolderAdd(tb1, tmp[i])
 
         tmp = CFG.renameFileOpt.split('#')
-        for (var i = 0; i < tmp.length; i++) { pnFolderAdd(tb2, tmp[i]) }
+        for (i = 0; i < tmp.length; i++) pnFolderAdd(tb2, tmp[i])
 
         if (tb1.children.length == 2) tb1.children[1].children[0].children[1].enabled = false
         if (tb2.children.length == 2) tb2.children[1].children[0].children[1].enabled = false
 
-        if (CFG.path != "") { dl1.selection = Number(CFG.newFolder) } else { dl1.selection = 0 }; dl1.onChange()
+        if (CFG.path != "") dl1.selection = Number(CFG.newFolder)
+        else dl1.selection = 0
+        dl1.onChange()
         stFormatValue.text = getStoredFormatLabel()
 
         stNew.text = makePath(CFG.renameFileOpt, CFG.subFolderOpt)
         ch2.value = CFG.createSubFolder; ch2.onClick()
         ch3.value = CFG.renameFile; ch3.onClick()
         ch4.value = CFG.replace
-        renew = true
 
+        renew = true
+        wn.layout.layout(true)
+
+        // These spacer widths are cosmetic only; calculate them after layout exists.
+        if (!fromPreset) {
+            try {
+                grDivSubfolder.preferredSize.width = tpn1.preferredSize.width - ch2.preferredSize.width - bnResetSubfolder.preferredSize.width - 50
+                grDivFile.preferredSize.width = tpn1.preferredSize.width - ch3.preferredSize.width - bnResetFile.preferredSize.width - 50
+            } catch (e) {}
+        }
+    }
+
+    // Keep onShow only as a harmless fallback. Normal initialization is explicit below.
+    var windowInitialized = false
+    wn.onShow = function () {
+        if (!windowInitialized) {
+            refreshWindow(false)
+            windowInitialized = true
+        }
     }
 
     function loadPresets() {
@@ -676,32 +660,34 @@ bnResetFile.onClick = function (){
 ///////////////////////////////////////////////////////////////////////////////////
 function pnFolderAdd (parent, s)
 {
+    if (s == undefined || s == "") s = parent.text == strTabFile ? "0" : "1"
+
      // grFolder
     // ========
-    var grFolder = parent.add("group"); 
-        grFolder.orientation = "row"; 
-        grFolder.alignChildren = ["left","center"]; 
-        grFolder.spacing = 10; 
-        grFolder.margins = 0; 
-        grFolder.alignment = ["fill","top"]; 
+    var grFolder = parent.add("group");
+        grFolder.orientation = "row";
+        grFolder.alignChildren = ["left","center"];
+        grFolder.spacing = 10;
+        grFolder.margins = 0;
+        grFolder.alignment = ["fill","top"];
         
     // GRBTN
     // =====
-    var grBtn = grFolder.add("group"); 
-        grBtn.orientation = "row"; 
-        grBtn.alignChildren = ["left","center"]; 
-        grBtn.spacing = 0; 
-        grBtn.margins = 0; 
+    var grBtn = grFolder.add("group");
+        grBtn.orientation = "row";
+        grBtn.alignChildren = ["left","center"];
+        grBtn.spacing = 0;
+        grBtn.margins = 0;
 
-    var bnAdd = grBtn.add("button"); 
-        bnAdd.text = "+"; 
-        bnAdd.preferredSize.width = 30; 
-        bnAdd.justify = "center"; 
+    var bnAdd = grBtn.add("button");
+        bnAdd.text = "+";
+        bnAdd.preferredSize.width = 30;
+        bnAdd.justify = "center";
 
-    var bnDel = grBtn.add("button"); 
-        bnDel.text = "-"; 
-        bnDel.preferredSize.width = 30; 
-        bnDel.justify = "center"; 
+    var bnRowDelete = grBtn.add("button");
+        bnRowDelete.text = "-";
+        bnRowDelete.preferredSize.width = 30;
+        bnRowDelete.justify = "center";
 
     // grFolder
     // ========
@@ -740,17 +726,17 @@ function addSubpanel (s)
      //найти строку, в которой нажата эта кнопка и вставить новую после нее
      if (parent.children.length == 2) parent.children[1].children[0].children[1].enabled=true
      renew = false
-     var cur 
+     var cur, tmp, tmpCache, delLines
      var newArr = []
      // определяем, с какой строкой/массивом будем сейчас работать
-     if (parent.text ==strTabFile) {var tmp = CFG.renameFileOpt; var tmpCache = cacheFle} else {var tmp = CFG.subFolderOpt;; var tmpCache = cacheFld}
-     tmp=tmp.split ('#')
+     if (parent.text == strTabFile) {tmp = CFG.renameFileOpt; tmpCache = cacheFle} else {tmp = CFG.subFolderOpt; tmpCache = cacheFld}
+     tmp = tmp.split('#')
     
      // ищем в каком ряду нажата кнопка
      for (var i=1; i<parent.children.length;i++) {if (parent.children[i]==grFolder) {cur = i+1; break}}
      
      //удаляем строки, расположенные ниже
-     var delLines = parent.children.length;
+     delLines = parent.children.length;
      for (var i=cur; i<delLines;i++) {parent.remove(parent.children[cur])}
     
     // добавляем пустую строку     
@@ -777,7 +763,7 @@ function addSubpanel (s)
      }
     }
 
- bnDel.onClick = function () {
+ bnRowDelete.onClick = function () {
      
      if (parent.children.length>2)
      {
@@ -799,12 +785,12 @@ function addSubpanel (s)
  {
     // grOpt
     // =====
-  var grOpt = parent.add("group"); 
-        grOpt.orientation = "row"; 
-        grOpt.alignChildren = ["left","center"]; 
-        grOpt.spacing = 10; 
-        grOpt.margins = 0; 
-        grOpt.alignment = ["left","fill"]; 
+  var grOpt = parent.add("group");
+        grOpt.orientation = "row";
+        grOpt.alignChildren = ["left","center"];
+        grOpt.spacing = 10;
+        grOpt.margins = 0;
+        grOpt.alignment = ["left","fill"];
                 
     var dropdown2_array = [strAlbum,strPortrait,"WxH","W","H",strResolution]; 
     var dropdown2 = grOpt.add("dropdownlist", undefined, dropdown2_array); 
@@ -896,12 +882,12 @@ function grNameAdd (parent, s)
 {
 // GROPT1
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
 
 var dropdown5_array = [strName,strLrName,strExt,strParent,strParentOfParent,strAuthor,strTitle,strCamera]; 
 var dropdown5 = grOpt.add("dropdownlist", undefined, dropdown5_array); 
@@ -950,16 +936,16 @@ function grTextAdd (parent, s)
 {
 // GROPT
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
 
-var edittext1 = grOpt.add("edittext"); 
-    edittext1.preferredSize.width = 270; 
-    edittext1.preferredSize.height = h
+var edittext1 = grOpt.add("edittext");
+    edittext1.preferredSize.width = 270;
+    edittext1.preferredSize.height = h;
     
     edittext1.helpTip =  strTipPaste
 
@@ -978,12 +964,12 @@ function grDateAdd (parent, s)
 {
  // GROPT
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
 
 var dropdown8_array = [strCreated,strMod,strToday,strYestedray,strTomorrow]; 
 var dropdown8 = grOpt.add("dropdownlist", undefined, dropdown8_array); 
@@ -1017,21 +1003,21 @@ function grReplaceAdd (parent, s)
 
 // GROPT4
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
 
-var statictext1 = grOpt.add("statictext"); 
-    statictext1.text = strSearch; 
-    statictext1.preferredSize.width = 40;  
+var stSearch = grOpt.add("statictext");
+    stSearch.text = strSearch;
+    stSearch.preferredSize.width = 40;
     
-var edittext2 = grOpt.add("edittext"); 
-    edittext2.preferredSize.width = 100; 
-    edittext2.helpTip =  strTipSearchLine
-    edittext2.preferredSize.height = h
+var edittext2 = grOpt.add("edittext");
+    edittext2.preferredSize.width = 100;
+    edittext2.preferredSize.height = h;
+    edittext2.helpTip = strTipSearchLine
     
 var dropdown12_array = [strReplaced,strAddToBegin,strAddToEnd]; 
 var dropdown12 = grOpt.add("dropdownlist", undefined, dropdown12_array); 
@@ -1040,10 +1026,10 @@ var dropdown12 = grOpt.add("dropdownlist", undefined, dropdown12_array);
     dropdown12.helpTip = strTipAction
     dropdown12.preferredSize.height = h
     
-var edittext3 = grOpt.add("edittext"); 
-    edittext3.preferredSize.width =125; 
-    edittext3.helpTip=strTipPaste
-    edittext3.preferredSize.height = h
+var edittext3 = grOpt.add("edittext");
+    edittext3.preferredSize.width = 125;
+    edittext3.preferredSize.height = h;
+    edittext3.helpTip = strTipPaste
     
 loadSubPanel (s, grOpt)
 
@@ -1064,18 +1050,18 @@ function grSeqAdd (parent, s)
 
 // GROPT4
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
     
-var edittext2 = grOpt.add("edittext"); 
-    edittext2.preferredSize.width = 100; 
-    edittext2.helpTip =  strTipBegin
+var edittext2 = grOpt.add("edittext");
+    edittext2.preferredSize.width = 100;
+    edittext2.preferredSize.height = h;
+    edittext2.helpTip = strTipBegin
     edittext2.label = "seq"
-    edittext2.preferredSize.height = h
     
 var dropdown12_array = [strOneDig, strTwoDig, strThreeDig, strFourDig, strFiveDig]; 
 var dropdown12 = grOpt.add("dropdownlist", undefined, dropdown12_array); 
@@ -1114,16 +1100,16 @@ function grSubfolderAdd (parent, s)
 {
 // GROPT
 // ======
-var grOpt = parent.add("group"); 
-    grOpt.orientation = "row"; 
-    grOpt.alignChildren = ["left","center"]; 
-    grOpt.spacing = 10; 
-    grOpt.margins = 0; 
-    grOpt.alignment = ["left","fill"]; 
+var grOpt = parent.add("group");
+    grOpt.orientation = "row";
+    grOpt.alignChildren = ["left","center"];
+    grOpt.spacing = 10;
+    grOpt.margins = 0;
+    grOpt.alignment = ["left","fill"];
 
-var edittext1 = grOpt.add("edittext"); 
-    edittext1.preferredSize.width = 270; 
-    edittext1.preferredSize.height = h
+var edittext1 = grOpt.add("edittext");
+    edittext1.preferredSize.width = 270;
+    edittext1.preferredSize.height = h;
     
     edittext1.onChanging = function () {if (renew) collectSubfolderSettings(grOpt.parent.parent)}
     loadSubPanel (s, grOpt)
@@ -1131,6 +1117,11 @@ var edittext1 = grOpt.add("edittext");
 if (renew) {wn.layout.layout (true); collectSubfolderSettings(grOpt.parent.parent) }
 }
 
+
+// Build dynamic editor rows before Window.show(). This restores the original
+// default/preset behavior without requiring the user to press Reset.
+refreshWindow(false)
+windowInitialized = true
 
 return wn
 }
@@ -1166,14 +1157,14 @@ function objectToDescriptor (o, s)
     d.putString(app.charIDToTypeID('Msge'), s)
 
     for (var i = 0; i < descriptorKeys.length; i++) {
-        var name = descriptorKeys[i]
-        if (!o.hasOwnProperty(name)) continue
-        var v = o[name]
-        var key = app.stringIDToTypeID(name)
-        switch (typeof(v)) {
-            case "boolean": d.putBoolean(key, v); break
-            case "string": d.putString(key, v); break
-            case "number": d.putInteger(key, v); break
+        var propName = descriptorKeys[i];
+        if (!o.hasOwnProperty(propName)) continue;
+        var propValue = o[propName];
+        var keyID = app.stringIDToTypeID(propName);
+        switch (typeof(propValue)) {
+            case "boolean": d.putBoolean(keyID, propValue); break;
+            case "string": d.putString(keyID, propValue); break;
+            case "number": d.putInteger(keyID, propValue); break;
         }
     }
 
@@ -1425,19 +1416,20 @@ function getSize (mode, units, div)
         app.preferences.rulerUnits = oldPref
     }
 
-    function round (val, mode)
+    function round (val, precisionMode)
     {
+        var tmp
         if (val instanceof UnitValue) {val=val.value}
-        switch (Number (mode))
+        switch (Number (precisionMode))
         {
             case 0: return Math.round (val); break;
             case 1: 
-                var tmp = String(Math.round (val*10)/10)
+                tmp = String(Math.round (val*10)/10)
                 if (tmp.indexOf (".") == -1 && tmp.indexOf (",") == -1) tmp += ".0"
                 return tmp
                 break;
             case 2: 
-                var tmp = String(Math.round (val*100)/100)
+                tmp = String(Math.round (val*100)/100)
                 if (tmp.indexOf (".") == -1 && tmp.indexOf (",") == -1) tmp += ".0"
                 if (tmp.indexOf (".") >= tmp.length-2 || tmp.indexOf (",") >= tmp.length-2) tmp += "0"
                 return tmp
@@ -1456,13 +1448,14 @@ function grDate (s)
     var dt = new Object
     var c = ""
     var div = "-"
+    var dateValue
     switch (Number (s[1]))
     {
         case 0: getDt (metadata.created, dt); break;
         case 1: getDt (metadata.modified, dt); break;
-        case 2: var a = new Date; getDt (a, dt); break;
-        case 3: var a = new Date; a.setDate (Number(a.getDate()-1)); getDt (a, dt); break;
-        case 4: var a = new Date; a.setDate (Number(a.getDate()+1)); getDt (a, dt); break;
+        case 2: dateValue = new Date; getDt(dateValue, dt); break;
+        case 3: dateValue = new Date; dateValue.setDate(Number(dateValue.getDate()-1)); getDt(dateValue, dt); break;
+        case 4: dateValue = new Date; dateValue.setDate(Number(dateValue.getDate()+1)); getDt(dateValue, dt); break;
      }
  
      switch (Number (s[2]))
@@ -1485,15 +1478,14 @@ function grDate (s)
         case 15:  c=dt.ss; break;
      }
  
- function getDt (dt, d)
+ function getDt (sourceDate, d)
  {
-     d.YY = String(Number(dt.getYear()) + 1900)
-     d.MM = String(Number (dt.getMonth()) + 1); if (d.MM.length==1) d.MM= "0" + d.MM
-     d.DD = String (dt.getDate()); if (d.DD.length==1) d.DD= "0" + d.DD
-     
-     d.hh = String (dt.getHours()); if (d.hh.length==1) d.hh = "0" + d.hh 
-     d.mm = String(dt.getMinutes()); if (d.mm.length==1) d.mm= "0" + d.mm 
-     d.ss = String (dt.getSeconds()); if (d.ss.length==1) d.ss= "0" + d.ss
+     d.YY = String(Number(sourceDate.getYear()) + 1900)
+     d.MM = String(Number(sourceDate.getMonth()) + 1); if (d.MM.length==1) d.MM = "0" + d.MM
+     d.DD = String(sourceDate.getDate()); if (d.DD.length==1) d.DD = "0" + d.DD
+     d.hh = String(sourceDate.getHours()); if (d.hh.length==1) d.hh = "0" + d.hh
+     d.mm = String(sourceDate.getMinutes()); if (d.mm.length==1) d.mm = "0" + d.mm
+     d.ss = String(sourceDate.getSeconds()); if (d.ss.length==1) d.ss = "0" + d.ss
   }   
 
 return c
@@ -1626,7 +1618,8 @@ function Metadata ()
     try { this.curPath = doc.path.fsName } catch (e) { this.curPath = "" }  //curPath
     this.curExt = doc.name.lastIndexOf(".") != -1 ? doc.name.substr(doc.name.lastIndexOf(".") + 1) : "" //curExt
     this.lrName = doc.activeLayer.name //lrName
-    try {var pth = doc.path.fsName.replace(":","").split(sysDiv)} catch (e) {var pth = []}
+    var pth = []
+    try {pth = doc.path.fsName.replace(":","").split(sysDiv)} catch (e) {}
     var shift = pth[pth.length - 1] == "" ? 1 : 0
     this.parentPath = pth.length >= 1+shift ? pth[pth.length - (1 +shift)] : ""//parentPath
     this.parentOfParentPath =  pth.length >= 2+shift ? pth[pth.length - (2+shift)] : ""  //parent of parent
@@ -2078,7 +2071,8 @@ function Preset() {
     }
 
     function sortPresets(a, b) {
-        if (a.key >= b.key) { return 1 } else { return -1 }
+        if (a.key == b.key) return 0
+        return a.key > b.key ? 1 : -1
     }
 
     this.putSettingsToArray = function (s) {
@@ -2097,11 +2091,11 @@ function Preset() {
         s.replace = a[4] == "true" ? true : false
     }
 
-    this.checkPresetIntegrity = function (window) {
+    this.checkPresetIntegrity = function (wnd) {
 
-        var dlPreset = window.children[1].children[0]
-        var bnRefresh = window.children[1].children[1]
-        var bnSave = window.children[1].children[2]
+        var dlPreset = wnd.children[1].children[0]
+        var bnRefresh = wnd.children[1].children[1]
+        var bnSave = wnd.children[1].children[2]
 
         if (dlPreset.selection.index > 0) {
             var cur = preset.putSettingsToArray(CFG)
@@ -2110,3 +2104,5 @@ function Preset() {
         } else { bnSave.enabled = false; bnRefresh.enabled = true }
     }
 }
+
+})();
