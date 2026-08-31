@@ -1,4 +1,4 @@
-///////////////////////////////////////////////////////////////////////////////
+﻿///////////////////////////////////////////////////////////////////////////////
 // Smart save
 // jazz-y@ya.ru
 ///////////////////////////////////////////////////////////////////////////////
@@ -40,7 +40,7 @@ $.localize = true
 
 //bin here
 var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
-    ver = "0.12",
+    ver = "0.12.1",
     stCurFilename = { en: "Current filename:", ru: "Текущее имя:" },
     stNewFilname = { en: "New filename:", ru: "Новое имя:" },
     strAddToBegin = { en: "Insert before", ru: "Добавить в начало" },
@@ -149,6 +149,13 @@ var preset = new Preset();
 
 var cacheFld = makeSmartSaveCache(); // кэш для настроек и значений каталогов
 var cacheFle = makeSmartSaveCache(); // кэш для настроек и значений файлов
+
+var descriptorKeys = [
+    "newFolder", "path",
+    "createSubFolder", "subFolderOpt",
+    "renameFile", "renameFileOpt",
+    "sequenceId", "replace", "preset"
+]
 
 function makeSmartSaveCache()
 {
@@ -1144,13 +1151,6 @@ function Config ()
     this.saveDescriptor = ""
 }
 
-var descriptorKeys = [
-    "newFolder", "path",
-    "createSubFolder", "subFolderOpt",
-    "renameFile", "renameFileOpt",
-    "sequenceId", "replace", "preset"
-]
-
 function objectToDescriptor (o, s) 
 {
     var d = new ActionDescriptor
@@ -1748,8 +1748,11 @@ function prepareSaveDescriptor(d, target, useCopy)
 
 function prepareStoredSaveDescriptor(d, useCopy)
 {
+    // The interactive Save dialog is used only to capture the format and its options.
+    // Never persist the folder/file chosen there: playback always builds its own target path.
     try { d.erase(s2t("documentID")) } catch (e) {}
     try { d.erase(s2t("saveStage")) } catch (e) {}
+    try { d.erase(s2t("in")) } catch (e) {}
     try { d.erase(s2t("copy")) } catch (e) {}
     if (useCopy) d.putBoolean(s2t("copy"), true)
 }
