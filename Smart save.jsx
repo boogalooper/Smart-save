@@ -11,12 +11,15 @@
 <name>Smart save</name>
 <category>jazzy</category>
 <enableinfo>true</enableinfo>
-<eventid>d2801bd0-adb4-4872-bd68-a688d0e6e151</eventid>
+<eventid>68c86e88-e0d0-4571-a116-3d653eed4be3</eventid>
 <terminology><![CDATA[<< /Version 1
                         /Events <<
-                        /d2801bd0-adb4-4872-bd68-a688d0e6e151 [(Smart save) <<
+                        /68c86e88-e0d0-4571-a116-3d653eed4be3 [(Smart save) <<
                         /newFolder [(saveToNewFolder) /boolean]
                         /path [(destinationPath) /string]
+                        /fileType [(fileType) /string]
+                        /jpgQuality [(jpgQuality) /number]
+                        /flatten [(flattenLayers) /boolean]
                         /createSubFolder [(createSubfolder) /boolean]
                         /subFolderOpt [(subfolderTemplate) /string]
                         /renameFile [(renameFile) /boolean]
@@ -25,6 +28,7 @@
                         /replace [(overwriteExisting) /boolean]
                         /preset [(preset) /string]
                         /saveFormat [(saveFormat) /string]
+                        /saveExtension [(saveExtension) /string]
                         /saveDescriptor [(saveOptions) /string]
                         >>]
                          >>
@@ -39,8 +43,9 @@ $.localize = true
 //$.locale = "ru"
 
 //bin here
-var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
-    ver = "0.12.1",
+var GUID = "68c86e88-e0d0-4571-a116-3d653eed4be3",
+    COMPAT_GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
+    ver = "0.12.8",
     stCurFilename = { en: "Current filename:", ru: "Текущее имя:" },
     stNewFilname = { en: "New filename:", ru: "Новое имя:" },
     strAddToBegin = { en: "Insert before", ru: "Добавить в начало" },
@@ -88,7 +93,6 @@ var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
     strRoundDec = { en: "Up to decimal", ru: "До десятых" },
     strRoundInt = { en: "Up to integer", ru: "До целого" },
     strRoundTwoDec = { en: "Up to two decimal", ru: "До сотых" },
-    strSaveFile = { en: "Save opened file", ru: "Сохранить открытый файл" },
     strSearch = { en: "Search:", ru: "Найти:" },
     strSeq = { en: "Sequence", ru: "Счетчик" },
     strSize = { en: "Dimensions", ru: "Размер" },
@@ -137,7 +141,8 @@ var GUID = "d2801bd0-adb4-4872-bd68-a688d0e6e151",
 
 var sysDiv = "/"; if ( $.os.search(/windows/i) != -1 ) {sysDiv='\\'}
 
-var PRESET_KEY = GUID + "-presets";
+var PRESET_KEY = "SmartSave";
+var COMPAT_PRESET_KEY = COMPAT_GUID + "-presets";
 
 var saveButtonID = 1;
 var cancelButtonID = 2;
@@ -152,9 +157,10 @@ var cacheFle = makeSmartSaveCache(); // кэш для настроек и зна
 
 var descriptorKeys = [
     "newFolder", "path",
+    "fileType", "jpgQuality", "flatten",
     "createSubFolder", "subFolderOpt",
     "renameFile", "renameFileOpt",
-    "sequenceId", "replace", "preset"
+    "sequenceId", "replace", "preset", "saveExtension"
 ]
 
 function makeSmartSaveCache()
@@ -176,7 +182,15 @@ function main ()
         try {
             d = app.getCustomOptions(GUID)
             if (d != undefined) descriptorToObject(CFG, d, strMessage)
-        } catch (e) {}
+        } catch (e) {
+            // Transitional 0.12.x builds briefly used another UUID. Read those
+            // custom options as a fallback, but always write back under the
+            // original Smart Save UUID so old Actions remain addressable.
+            try {
+                d = app.getCustomOptions(COMPAT_GUID)
+                if (d != undefined) descriptorToObject(CFG, d, strMessage)
+            } catch (e2) {}
+        }
 
         initSeq()
         generateUUID()
@@ -198,6 +212,11 @@ function main ()
     d = app.playbackParameters
     descriptorToObject(CFG, d, strMessage)
 
+    // A path recovered during a previous silent Action run is stored separately
+    // from the recorded Action descriptor. Apply it before either editing or replaying
+    // the step, so the repaired destination remains effective on subsequent runs.
+    applyActionPathOverride()
+
     if (app.playbackDisplayDialogs == DialogModes.ALL)
     {
         // double click / edit action step
@@ -214,6 +233,7 @@ function main ()
         if (oldSequenceId != "") {
             try { app.eraseCustomOptions(oldSequenceId) } catch (e) {}
             try { app.eraseCustomOptions(oldSequenceId + "_docID") } catch (e) {}
+            try { app.eraseCustomOptions(oldSequenceId + "_pathOverride") } catch (e) {}
         }
         generateUUID()
 
@@ -226,6 +246,14 @@ function main ()
     // silent action playback
     initSeq()
     if (CFG.saveDescriptor == "") {
+        // Actions recorded by the original 0.8 branch contain fileType /
+        // jpgQuality / flatten instead of a captured Photoshop descriptor.
+        // Execute them with their original save semantics until the user
+        // explicitly migrates the step via "Save again...".
+        if (hasLegacySaveSettings()) {
+            if (saveWithLegacySettings()) commitSeqState(true)
+            return
+        }
         alert(msgNoSaveDescriptor)
         return
     }
@@ -260,7 +288,7 @@ var bn1 = gr1.add("button{preferredSize:[75,-1]}");
 var gr2 = pn1.add("group{orientation:'row',alignChildren:['left','center'],spacing:8}");
 
 var et1 = gr2.add("edittext{preferredSize:[300,-1],properties:{readonly:true}}");
-var stFormatLabel = gr2.add("statictext", undefined, strFormat);
+gr2.add("statictext", undefined, strFormat);
 var stFormatValue = gr2.add("statictext{preferredSize:[110,-1]}");
 
 var h = et1.preferredSize.height > dl1.preferredSize.height ? et1.preferredSize.height : dl1.preferredSize.height;
@@ -466,11 +494,10 @@ bnSaveAs.onClick = function ()
 
 bnPresetDelete.onClick = function ()
 {
-  var a = preset.putSettingsToArray (CFG)
   var nm = dlPreset.selection.text
   var num = dlPreset.selection.index
 
-  preset.putPreset (nm, a, "delete")
+  preset.putPreset (nm, "", "delete")
   loadPresets ()
 
   num = num > dlPreset.items.length-1 ? dlPreset.items.length-1 : num
@@ -492,7 +519,7 @@ bnRefresh.onClick = function () {dlPreset.onChange()}
 
     function setSaveButtonsEnabled(v) {
         bnOk.enabled = Boolean(v)
-        if (bnSettings) bnSettings.enabled = Boolean(v) && CFG.saveDescriptor != ""
+        if (bnSettings) bnSettings.enabled = Boolean(v) && (CFG.saveDescriptor != "" || hasLegacySaveSettings())
     }
 
 dl1.onChange = function ()
@@ -637,15 +664,6 @@ bnResetFile.onClick = function (){
                 grDivSubfolder.preferredSize.width = tpn1.preferredSize.width - ch2.preferredSize.width - bnResetSubfolder.preferredSize.width - 50
                 grDivFile.preferredSize.width = tpn1.preferredSize.width - ch3.preferredSize.width - bnResetFile.preferredSize.width - 50
             } catch (e) {}
-        }
-    }
-
-    // Keep onShow only as a harmless fallback. Normal initialization is explicit below.
-    var windowInitialized = false
-    wn.onShow = function () {
-        if (!windowInitialized) {
-            refreshWindow(false)
-            windowInitialized = true
         }
     }
 
@@ -1128,7 +1146,6 @@ if (renew) {wn.layout.layout (true); collectSubfolderSettings(grOpt.parent.paren
 // Build dynamic editor rows before Window.show(). This restores the original
 // default/preset behavior without requiring the user to press Reset.
 refreshWindow(false)
-windowInitialized = true
 
 return wn
 }
@@ -1141,6 +1158,10 @@ function Config ()
 {
     this.newFolder = false
     this.path = ""
+    // Legacy 0.8 action fields. Empty fileType means the modern descriptor path.
+    this.fileType = ""
+    this.jpgQuality = 12
+    this.flatten = false
     this.subFolderOpt = "1"
     this.createSubFolder = false
     this.renameFile = true
@@ -1148,6 +1169,7 @@ function Config ()
     this.sequenceId = ""
     this.replace = true
     this.preset = ""
+    this.saveExtension = ""
     this.saveDescriptor = ""
 }
 
@@ -1176,7 +1198,6 @@ function objectToDescriptor (o, s)
 
 function descriptorToObject (o, d, s) 
 {
-    $.writeln (" ")
 	var l = d.count;
 	if (l) {
 	    var keyMessage = app.charIDToTypeID( 'Msge' );
@@ -1198,7 +1219,6 @@ function descriptorToObject (o, d, s)
 				o[strk] = d.getInteger(k);
 				break;
 		}
-      //  $.writeln ('get ' + typeof(o[strk]) + ' "' + strk  +'": ' + o[strk])
 	}
 }
 
@@ -1261,6 +1281,7 @@ function collectSubfolderSettings (parent)
         preset.checkPresetIntegrity(parent.parent.parent)
 
         return s
+}
 
 //сохранить настройки подгруппы в строку
 function loadSubPanelSettings (parent)
@@ -1304,7 +1325,6 @@ function loadSubPanelSettings (parent)
     s = s.substr (0, s.length-1)
     } catch (e) {s=""}
     return s
-}
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1393,7 +1413,8 @@ function grSize (s)
 
     
        return c
-       
+}
+
 function getSize (mode, units, div)
 {
     var oldPref = app.preferences.rulerUnits
@@ -1422,24 +1443,20 @@ function getSize (mode, units, div)
         if (val instanceof UnitValue) {val=val.value}
         switch (Number (precisionMode))
         {
-            case 0: return Math.round (val); break;
+            case 0: return Math.round (val);
             case 1: 
                 tmp = String(Math.round (val*10)/10)
                 if (tmp.indexOf (".") == -1 && tmp.indexOf (",") == -1) tmp += ".0"
                 return tmp
-                break;
             case 2: 
                 tmp = String(Math.round (val*100)/100)
                 if (tmp.indexOf (".") == -1 && tmp.indexOf (",") == -1) tmp += ".0"
                 if (tmp.indexOf (".") >= tmp.length-2 || tmp.indexOf (",") >= tmp.length-2) tmp += "0"
                 return tmp
-            break;
         }
     }
    
     return c
-}
-    
 }
 
 //время
@@ -1638,7 +1655,6 @@ function Metadata ()
 // проверка и инкремент счетчиков
 function initSeq (editMode)
 {
-      //app.eraseCustomOptions(String(GUID));
          var tmp = CFG.renameFileOpt.split ('#')
          var s = ""
          var found = false
@@ -1677,31 +1693,26 @@ function initSeq (editMode)
 
 function saveWithPhotoshopDialog()
 {
-    var target = buildTargetFile()
+    // For an interactive save, a stale/unavailable saved base path must not stop
+    // the user before Photoshop can show its Save dialog. buildTargetFile() falls
+    // back to the current document folder and records that recovery here.
+    // Only directories created for this particular attempt are tracked.
+    var createdFolders = []
+    var pathRecovery = {}
+    var target = buildTargetFile(createdFolders, pathRecovery)
     if (!target) return false
 
-    // Prefer Save a Copy semantics. In older Photoshop versions the same save event
-    // may expose only the legacy Save As workflow. If copy mode itself fails, retry
-    // interactively without the copy flag and remember that mode for action playback.
+    // Always request Save a Copy. Photoshop versions that do not use this flag
+    // simply ignore copy=true; do not retry the save with another method.
     var d = CFG.saveDescriptor != "" ? descriptorFromBase64(CFG.saveDescriptor) : new ActionDescriptor()
     prepareSaveDescriptor(d, target, true)
 
     var result
-    var mode = "copy"
     try {
         result = executeAction(s2t("save"), d, DialogModes.ALL)
     } catch (e) {
         if (isUserCancel(e)) return false
-
-        var fallback = CFG.saveDescriptor != "" ? descriptorFromBase64(CFG.saveDescriptor) : new ActionDescriptor()
-        prepareSaveDescriptor(fallback, target, false)
-        try {
-            result = executeAction(s2t("save"), fallback, DialogModes.ALL)
-            mode = "saveAs"
-        } catch (e2) {
-            if (isUserCancel(e2)) return false
-            throw e2
-        }
+        throw e
     }
 
     var captured = hasSaveFormat(result) ? result : null
@@ -1710,9 +1721,108 @@ function saveWithPhotoshopDialog()
         return false
     }
 
-    prepareStoredSaveDescriptor(captured, mode == "copy")
+    // Capture the extension from the file Photoshop actually saved before removing
+    // its path from the reusable descriptor. This works for formats not present in
+    // the display-name map as well.
+    captureSaveExtension(captured)
+
+    // The dialog starts at the path/name generated by Smart Save. If the user
+    // deliberately navigates to another folder, treat that folder as the new
+    // BASE destination for subsequent saves. Subfolder rules still apply below it.
+    // The chosen filename itself is not adopted: naming remains controlled by
+    // Smart Save rules.
+    var destinationChanged = adoptManualDestinationIfChanged(captured, target, pathRecovery)
+
+    // If the user deliberately saved somewhere else, the folders created only
+    // to open the dialog at Smart Save's proposed path are test artifacts. Remove
+    // only folders created by this call, deepest first, and only while they are
+    // still empty. Existing/user folders are never added to createdFolders.
+    if (destinationChanged) removeCreatedEmptyFolders(createdFolders)
+
+    prepareStoredSaveDescriptor(captured)
     CFG.saveDescriptor = descriptorToBase64(captured)
+
+    // From this point the step is migrated to the descriptor-based format.
+    // Keep legacy fields only for untouched old Actions.
+    CFG.fileType = ""
+    CFG.jpgQuality = 12
+    CFG.flatten = false
     return true
+}
+
+function hasLegacySaveSettings()
+{
+    var t = String(CFG.fileType || "").toLowerCase()
+    return t == "jpg" || t == "jpeg" || t == "tif" || t == "tiff" || t == "psd"
+}
+
+function getLegacyExtension()
+{
+    var t = String(CFG.fileType || "").toLowerCase()
+    if (t == "jpeg") return "jpg"
+    if (t == "tiff") return "tif"
+    return (t == "jpg" || t == "tif" || t == "psd") ? t : ""
+}
+
+function saveWithLegacySettings()
+{
+    var createdFolders = []
+    var target
+    try {
+        target = buildTargetFile(createdFolders)
+    } catch (e) {
+        if (!isPathBuildError(e)) throw e
+        removeCreatedEmptyFolders(createdFolders)
+        return saveWithActionPathRecovery(e)
+    }
+    if (!target) return false
+
+    var t = getLegacyExtension()
+    if (t == "") return false
+
+    var doc = app.activeDocument
+    var hs = null
+    var mustRestore = false
+
+    try {
+        if (t == "jpg") {
+            hs = doc.activeHistoryState
+            mustRestore = true
+            var jpegOptions = new JPEGSaveOptions()
+            var q = Math.round(Number(CFG.jpgQuality))
+            if (isNaN(q)) q = 12
+            if (q < 1) q = 1
+            if (q > 12) q = 12
+            jpegOptions.quality = q
+            doc.flatten()
+            doc.saveAs(target, jpegOptions, true)
+        }
+        else if (t == "tif") {
+            if (CFG.flatten) {
+                hs = doc.activeHistoryState
+                mustRestore = true
+                doc.flatten()
+            }
+            var tiffOptions = new TiffSaveOptions()
+            tiffOptions.imageCompression = TIFFEncoding.NONE
+            doc.saveAs(target, tiffOptions, true)
+        }
+        else if (t == "psd") {
+            if (CFG.flatten) {
+                hs = doc.activeHistoryState
+                mustRestore = true
+                doc.flatten()
+            }
+            var psdOptions = new PhotoshopSaveOptions()
+            doc.saveAs(target, psdOptions, true)
+        }
+        return true
+    }
+    finally {
+        if (mustRestore && hs != null) {
+            try { doc.activeHistoryState = hs } catch (e) {}
+        }
+    }
 }
 
 function saveWithStoredDescriptor()
@@ -1722,18 +1832,87 @@ function saveWithStoredDescriptor()
         return false
     }
 
-    var target = buildTargetFile()
+    var createdFolders = []
+    var target
+    try {
+        target = buildTargetFile(createdFolders)
+    } catch (e) {
+        // Recover only from Smart Save's own destination-construction failure.
+        // Errors raised by Photoshop during the actual save are intentionally not
+        // converted into an interactive retry.
+        if (!isPathBuildError(e)) throw e
+        removeCreatedEmptyFolders(createdFolders)
+        return saveWithActionPathRecovery(e)
+    }
     if (!target) return false
 
     var d = descriptorFromBase64(CFG.saveDescriptor)
-    var useCopy = descriptorUsesCopy(d)
-    prepareSaveDescriptor(d, target, useCopy)
+    prepareSaveDescriptor(d, target, true)
 
-    // Do not retry a silent action save with another method: an error here can mean
-    // a bad path, permissions, disk space, etc. Falling back could unexpectedly rebind
-    // the open document to a new file. The fallback is selected only during interactive capture.
+    // One save attempt only. Real save errors must be reported rather than retried
+    // through a different save mode.
     executeAction(s2t("save"), d, DialogModes.NO)
     return true
+}
+
+function saveWithActionPathRecovery(pathError)
+{
+    // This function is reached only when an Action could not construct its configured
+    // destination (stale/disconnected base path or failure to create a generated
+    // subfolder). Do not retry the broken path. Open Photoshop's Save dialog directly
+    // in the current document folder and let the user choose the replacement base.
+    //
+    // This is deliberately PATH recovery only. A format changed by the user in this
+    // emergency dialog affects this one save, but does not silently rewrite the format
+    // recorded in the Action step.
+    var basePath = getCurrentDocumentFolderPath()
+    if (basePath == "") throw pathError
+
+    var target = buildRecoveryTargetFile(basePath)
+    if (!target) throw pathError
+
+    var d = CFG.saveDescriptor != "" ? descriptorFromBase64(CFG.saveDescriptor) : new ActionDescriptor()
+    prepareSaveDescriptor(d, target, true)
+    var targetExistedBefore = target.exists
+
+    var result
+    try {
+        result = executeAction(s2t("save"), d, DialogModes.ALL)
+    } catch (e) {
+        if (isUserCancel(e)) return false
+        // The dialog has already opened, so any error here is a real Photoshop save
+        // error and must not trigger another fallback/retry.
+        throw e
+    }
+
+    // Prefer the path Photoshop reports. If an older Photoshop version does not
+    // return it, use the proposed folder only when this attempt actually created
+    // the proposed target file. Otherwise the user's chosen folder is unknowable,
+    // so leaving the override unset is safer than remembering a wrong location.
+    var selectedFile = getDescriptorSaveFile(result)
+    var selectedFolder = selectedFile && selectedFile.parent ? selectedFile.parent : null
+    if (!selectedFolder && !targetExistedBefore && target.exists) selectedFolder = target.parent
+    if (selectedFolder) {
+        CFG.newFolder = true
+        CFG.path = selectedFolder.fsName
+        putActionPathOverride(CFG.path)
+    }
+
+    return true
+}
+
+function buildRecoveryTargetFile(basePath)
+{
+    if (basePath == "" || !Folder(basePath).exists) return null
+
+    var targetName = createName(CFG.renameFileOpt, cacheFle)
+    if (targetName == "" || CFG.renameFile == false) targetName = metadata.curFilename
+    targetName = sanitizeFileName(targetName)
+
+    // Recovery intentionally does not pre-create the configured Smart Save subfolder:
+    // the purpose is to guarantee that Photoshop opens in the known-good current
+    // document folder. After the user chooses a base, subfolder rules resume normally.
+    return File(CreateUniqueFileName(basePath, targetName, getPreferredSaveExtension()))
 }
 
 function prepareSaveDescriptor(d, target, useCopy)
@@ -1746,7 +1925,104 @@ function prepareSaveDescriptor(d, target, useCopy)
     if (useCopy) d.putBoolean(s2t("copy"), true)
 }
 
-function prepareStoredSaveDescriptor(d, useCopy)
+function adoptManualDestinationIfChanged(d, proposedTarget, pathRecovery)
+{
+    var selectedFile = getDescriptorSaveFile(d)
+    if (!selectedFile || !proposedTarget) return false
+
+    var proposedFolder = proposedTarget.parent
+    var selectedFolder = selectedFile.parent
+    if (!proposedFolder || !selectedFolder) return false
+
+    // A folder explicitly chosen in Photoshop always becomes the new BASE path.
+    // Any Smart Save subfolder rule will be applied below this base next time.
+    if (!sameFolder(proposedFolder, selectedFolder)) {
+        CFG.newFolder = true
+        CFG.path = selectedFolder.fsName
+        return true
+    }
+
+    // If the previously stored base path was unavailable and the user simply
+    // accepted the fallback location, persist the fallback BASE (not the generated
+    // subfolder) so the stale path is repaired instead of returning on the next run.
+    if (pathRecovery && pathRecovery.usedFallback && pathRecovery.basePath) {
+        CFG.newFolder = true
+        CFG.path = pathRecovery.basePath
+    }
+    return false
+}
+
+function removeCreatedEmptyFolders(createdFolders)
+{
+    if (!createdFolders || !createdFolders.length) return
+
+    // Reverse order is important for nested paths: child first, then its parent.
+    // Folder.remove() itself also refuses to remove a non-empty directory; the
+    // explicit getFiles() check makes the intention clear and avoids needless calls.
+    for (var i = createdFolders.length - 1; i >= 0; i--) {
+        try {
+            var fld = createdFolders[i]
+            if (fld && fld.exists && fld.getFiles().length == 0) fld.remove()
+        } catch (e) {}
+    }
+}
+
+function getDescriptorSaveFile(d)
+{
+    try {
+        var key = s2t("in")
+        if (d != undefined && d.hasKey(key)) return d.getPath(key)
+    } catch (e) {}
+    return null
+}
+
+function captureSaveExtension(d)
+{
+    var ext = ""
+    var selectedFile = getDescriptorSaveFile(d)
+
+    if (selectedFile) ext = getFileExtension(selectedFile)
+
+    // Backward/edge-case fallback for descriptors where Photoshop does not return
+    // an output path. The map is no longer the primary source of the extension.
+    if (ext == "") {
+        try { ext = getFormatInfo(d).ext } catch (e) {}
+    }
+
+    // Clear an old value if a newly captured format cannot provide an extension;
+    // keeping the previous format's suffix would be worse than falling back later.
+    CFG.saveExtension = String(ext || "").toLowerCase()
+}
+
+function getFileExtension(f)
+{
+    try {
+        var n = String(f.name)
+        var pos = n.lastIndexOf(".")
+        if (pos > 0 && pos < n.length - 1) return n.substr(pos + 1).toLowerCase()
+    } catch (e) {}
+    return ""
+}
+
+function sameFolder(a, b)
+{
+    try {
+        var pa = String(a.fsName)
+        var pb = String(b.fsName)
+
+        // Photoshop/ExtendScript may vary slash style and case on Windows.
+        if ($.os.search(/windows/i) != -1) {
+            pa = pa.split("\\").join("/").replace(/\/+$/g, "").toLowerCase()
+            pb = pb.split("\\").join("/").replace(/\/+$/g, "").toLowerCase()
+        } else {
+            pa = pa.replace(/\/+$/g, "")
+            pb = pb.replace(/\/+$/g, "")
+        }
+        return pa == pb
+    } catch (e) { return false }
+}
+
+function prepareStoredSaveDescriptor(d)
 {
     // The interactive Save dialog is used only to capture the format and its options.
     // Never persist the folder/file chosen there: playback always builds its own target path.
@@ -1754,15 +2030,7 @@ function prepareStoredSaveDescriptor(d, useCopy)
     try { d.erase(s2t("saveStage")) } catch (e) {}
     try { d.erase(s2t("in")) } catch (e) {}
     try { d.erase(s2t("copy")) } catch (e) {}
-    if (useCopy) d.putBoolean(s2t("copy"), true)
-}
-
-function descriptorUsesCopy(d)
-{
-    try {
-        var key = s2t("copy")
-        return d.hasKey(key) && d.getBoolean(key)
-    } catch (e) { return false }
+    d.putBoolean(s2t("copy"), true)
 }
 
 function hasSaveFormat(d)
@@ -1770,21 +2038,90 @@ function hasSaveFormat(d)
     try { return d != undefined && d.count > 0 && d.hasKey(s2t("as")) } catch (e) { return false }
 }
 
-function buildTargetFile()
+function makePathBuildError(path)
+{
+    var e = new Error(localize(msgCreateFolder, path))
+    try { e.smartSavePathError = true } catch (ignore) {}
+    return e
+}
+
+function isPathBuildError(e)
+{
+    try { return e != undefined && e.smartSavePathError === true } catch (ignore) { return false }
+}
+
+function buildTargetFile(createdFolders, pathRecovery)
 {
     var parentPath = ""
+    var basePath = ""
     var newPath = createName(CFG.subFolderOpt, cacheFld)
+    var interactiveRecovery = pathRecovery != undefined && pathRecovery != null
+    var explicitBase = CFG.newFolder == true && CFG.path != ""
 
-    if (CFG.newFolder == true && CFG.path != "") parentPath = CFG.path
-    else parentPath = metadata.curPath
+    if (explicitBase) basePath = CFG.path
+    else basePath = metadata.curPath
 
-    if (parentPath == "") {
+    // A base directory selected by the user is expected to already exist. Do not
+    // recursively recreate a stale drive/network path from old settings. During an
+    // interactive save, fall back to the document's current folder so Photoshop's
+    // Save dialog can still open and the user can choose a replacement base.
+    if (explicitBase && !Folder(basePath).exists) {
+        if (interactiveRecovery && getCurrentDocumentFolderPath() != "") {
+            basePath = getCurrentDocumentFolderPath()
+            pathRecovery.usedFallback = true
+        } else {
+            throw makePathBuildError(basePath)
+        }
+    }
+
+    if (basePath == "") {
         alert(msgSave)
         return null
     }
 
+    // If the document path itself disappeared (for example, a disconnected drive),
+    // interactive recovery is impossible without a known current directory.
+    if (!Folder(basePath).exists) {
+        alert(msgSave)
+        return null
+    }
+
+    parentPath = basePath
     if (CFG.createSubFolder && newPath != "") parentPath += sysDiv + newPath
-    if (!ensureFolder(parentPath)) throw new Error(localize(msgCreateFolder, parentPath))
+
+    if (!ensureFolder(parentPath, createdFolders)) {
+        // The configured base may exist but still be unusable for creating the
+        // generated subfolder (permissions, disconnected storage, etc.). For a
+        // manual save, retry from the current document folder. If even the generated
+        // subfolder cannot be created there, open the Save dialog in the current
+        // folder itself rather than blocking the user before the dialog appears.
+        if (interactiveRecovery) {
+            removeCreatedEmptyFolders(createdFolders)
+            if (createdFolders) createdFolders.length = 0
+
+            var fallbackBase = getCurrentDocumentFolderPath()
+            if (fallbackBase == "") {
+                throw makePathBuildError(parentPath)
+            }
+
+            basePath = fallbackBase
+            pathRecovery.usedFallback = true
+            parentPath = basePath
+            if (CFG.createSubFolder && newPath != "") parentPath += sysDiv + newPath
+
+            if (!ensureFolder(parentPath, createdFolders)) {
+                removeCreatedEmptyFolders(createdFolders)
+                if (createdFolders) createdFolders.length = 0
+                parentPath = basePath
+            }
+        } else {
+            throw makePathBuildError(parentPath)
+        }
+    }
+
+    if (interactiveRecovery) {
+        pathRecovery.basePath = basePath
+    }
 
     var targetName = createName(CFG.renameFileOpt, cacheFle)
     if (targetName == "" || CFG.renameFile == false) targetName = metadata.curFilename
@@ -1793,16 +2130,36 @@ function buildTargetFile()
     return File(CreateUniqueFileName(parentPath, targetName, getPreferredSaveExtension()))
 }
 
-function ensureFolder(path)
+function getCurrentDocumentFolderPath()
+{
+    try {
+        if (metadata.curPath != "") {
+            var fld = new Folder(metadata.curPath)
+            if (fld.exists) return fld.fsName
+        }
+    } catch (e) {}
+    return ""
+}
+
+function ensureFolder(path, createdFolders)
 {
     var fld = new Folder(path)
     if (fld.exists) return true
 
     var parent = fld.parent
     if (parent && !parent.exists && parent.fsName != fld.fsName) {
-        if (!ensureFolder(parent.fsName)) return false
+        if (!ensureFolder(parent.fsName, createdFolders)) return false
     }
-    return fld.create() || fld.exists
+
+    // Another process/user action could have created the folder while we were
+    // creating its parent. Such a folder is not ours and must not be tracked.
+    if (fld.exists) return true
+
+    if (fld.create()) {
+        if (createdFolders) createdFolders.push(fld)
+        return true
+    }
+    return fld.exists
 }
 
 function CreateUniqueFileName(inParentPath, inFileName, inFileExt)
@@ -1832,31 +2189,40 @@ function sanitizeFileName(s)
 function getPreferredSaveExtension()
 {
     var ext = getStoredSaveExtension()
+    if (ext == "" && hasLegacySaveSettings()) ext = getLegacyExtension()
     return ext != "" ? ext : metadata.curExt
 }
 
 function getStoredSaveExtension()
 {
+    // New descriptors store the actual suffix selected by Photoshop separately
+    // from the reusable save descriptor, so format support is not limited by a map.
+    if (CFG.saveExtension != undefined && CFG.saveExtension != "")
+        return String(CFG.saveExtension).toLowerCase()
+
+    // Backward compatibility with action steps recorded by older Smart Save versions.
     if (CFG.saveDescriptor == "") return ""
     try {
         var d = descriptorFromBase64(CFG.saveDescriptor)
         var info = getFormatInfo(d)
         if (info.ext != "") return info.ext
 
-        var key = s2t("in")
-        if (d.hasKey(key)) {
-            var f = d.getPath(key)
-            var n = f.name
-            var pos = n.lastIndexOf(".")
-            if (pos > 0 && pos < n.length - 1) return n.substr(pos + 1).toLowerCase()
-        }
-        return ""
+        var f = getDescriptorSaveFile(d)
+        return f ? getFileExtension(f) : ""
     } catch (e) { return "" }
 }
 
 function getStoredFormatLabel()
 {
-    if (CFG.saveDescriptor == "") return strNotSet
+    if (CFG.saveDescriptor == "") {
+        if (hasLegacySaveSettings()) {
+            var legacyExt = getLegacyExtension()
+            if (legacyExt == "jpg") return "JPEG"
+            if (legacyExt == "tif") return "TIFF"
+            if (legacyExt == "psd") return "PSD"
+        }
+        return strNotSet
+    }
     try {
         var info = getFormatInfo(descriptorFromBase64(CFG.saveDescriptor))
         if (info.label != "") return info.label
@@ -1980,6 +2346,56 @@ function generateUUID () {
     function s2t(s) {return stringIDToTypeID(s)}
     function t2s(s) {return typeIDToStringID(s)}
 
+function getActionPathOverrideKey()
+{
+    return CFG.sequenceId != undefined && String(CFG.sequenceId) != "" ? String(CFG.sequenceId) + "_pathOverride" : ""
+}
+
+function putActionPathOverride(path)
+{
+    var key = getActionPathOverrideKey()
+    if (key == "" || path == "") return
+    try {
+        var d = new ActionDescriptor()
+        d.putString(s2t('path'), String(path))
+        app.putCustomOptions(key, d, true)
+    } catch (e) {}
+}
+
+function getActionPathOverride()
+{
+    var key = getActionPathOverrideKey()
+    if (key == "") return ""
+    try {
+        var d = app.getCustomOptions(key)
+        return d.getString(s2t('path'))
+    } catch (e) { return "" }
+}
+
+function applyActionPathOverride()
+{
+    var key = getActionPathOverrideKey()
+    if (key == "") return false
+
+    var path = getActionPathOverride()
+    if (path == "") return false
+
+    try {
+        var fld = new Folder(path)
+        if (fld.exists) {
+            CFG.newFolder = true
+            CFG.path = fld.fsName
+            return true
+        }
+    } catch (e) {}
+
+    // A recovered destination can itself disappear later (network share, removable
+    // disk, renamed folder). Forget only the override; the recorded Action settings
+    // remain untouched and the normal path-recovery flow can ask the user again.
+    try { app.eraseCustomOptions(key) } catch (e2) {}
+    return false
+}
+
 function putSeqSettings (key, val)
 {
     var d = new ActionDescriptor();
@@ -2053,22 +2469,48 @@ function Preset() {
         for (var i = 0; i < output.length; i++) { d.putString(s2t(output[i].key), output[i].val) }
 
         app.putCustomOptions(PRESET_KEY, d);
+
+        // getPresetList() already merged the transitional 0.12.x store into output.
+        // Once the canonical store is written successfully, remove the compatibility
+        // copy; otherwise a deleted transitional preset would reappear on next load.
+        if (COMPAT_PRESET_KEY != PRESET_KEY) {
+            try { app.eraseCustomOptions(COMPAT_PRESET_KEY) } catch (e) {}
+        }
     }
 
     this.getPreset = function (key) {
         try {
             var d = app.getCustomOptions(PRESET_KEY);
             return d.getString(s2t(key))
-        } catch (e) { return "" }
+        } catch (e) {
+            try {
+                var d2 = app.getCustomOptions(COMPAT_PRESET_KEY);
+                return d2.getString(s2t(key))
+            } catch (e2) { return "" }
+        }
     }
 
     this.getPresetList = function () {
         var output = []
-        try {
-            var d = app.getCustomOptions(PRESET_KEY);
+        var seen = {}
 
-            for (var i = 0; i < d.count; i++) { output.push({ key: t2s(d.getKey(i)), val: d.getString(d.getKey(i)) }) }
-        } catch (e) { }
+        function appendFrom(storageKey) {
+            try {
+                var d = app.getCustomOptions(storageKey)
+                for (var i = 0; i < d.count; i++) {
+                    var k = t2s(d.getKey(i))
+                    if (!seen[k]) {
+                        output.push({ key: k, val: d.getString(d.getKey(i)) })
+                        seen[k] = true
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // The original script used "SmartSave". Keep it canonical, while also
+        // exposing presets created by the transitional 0.12.x UUID builds.
+        appendFrom(PRESET_KEY)
+        appendFrom(COMPAT_PRESET_KEY)
 
         return output.sort(sortPresets)
     }
